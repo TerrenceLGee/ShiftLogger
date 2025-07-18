@@ -10,13 +10,11 @@ namespace ShiftLogger.API.Services;
 public class ShiftService : IShiftService
 {
     private readonly ShiftLoggerDbContext _context;
-    private readonly IWorkerService _workerService;
     private readonly ILogger<ShiftService> _logger;
 
-    public ShiftService(ShiftLoggerDbContext context, IWorkerService workerService, ILogger<ShiftService> logger)
+    public ShiftService(ShiftLoggerDbContext context, ILogger<ShiftService> logger)
     {
         _context = context;
-        _workerService = workerService;
         _logger = logger;
     }
 
@@ -30,14 +28,14 @@ public class ShiftService : IShiftService
             if (shiftRequest.StartTime >= shiftRequest.EndTime)
                 return _logger.LogErrorAndReturnFail<ShiftResponse>("Start time must come before end time");
 
-            var workerResult = await _workerService.GetWorkerByIdAsync(shiftRequest.WorkerId);
-
-            if (!workerResult.IsSuccess || workerResult.Value is null)
-                return _logger.LogErrorAndReturnFail<ShiftResponse>(workerResult.ErrorMessage!);
+            var worker = await _context.Workers.FindAsync(shiftRequest.WorkerId);
+            if (worker is null)
+                return _logger.LogErrorAndReturnFail<ShiftResponse>($"There is no worker in the database with id = {shiftRequest.WorkerId}");
 
             var shift = new Shift
             {
                 WorkerId = shiftRequest.WorkerId,
+                Worker = worker,                
                 StartTime = shiftRequest.StartTime,
                 EndTime = shiftRequest.EndTime,
             };
@@ -46,7 +44,7 @@ public class ShiftService : IShiftService
 
             await _context.SaveChangesAsync();
 
-            return Result<ShiftResponse>.Ok(MapToShiftResponse(shift, workerResult.Value));
+            return Result<ShiftResponse>.Ok(MapToShiftResponse(shift, worker));
         }
         catch (DbUpdateException ex)
         {
@@ -76,18 +74,19 @@ public class ShiftService : IShiftService
             if (shift is null)
                 return _logger.LogErrorAndReturnFail<ShiftResponse>($"There is no shift with id = {shiftId} available in the database, nothing updated");
 
-            var workerResult = await _workerService.GetWorkerByIdAsync(shiftRequest.WorkerId);
+            var worker = await _context.Workers.FindAsync(shiftRequest.WorkerId);
 
-            if (!workerResult.IsSuccess || workerResult.Value is null)
-                return _logger.LogErrorAndReturnFail<ShiftResponse>(workerResult.ErrorMessage!);
+            if (worker is null)
+                return _logger.LogErrorAndReturnFail<ShiftResponse>($"There is no worker in the database with id = {shiftRequest.WorkerId}");
 
             shift.WorkerId = shiftRequest.WorkerId;
+            shift.Worker = worker;
             shift.StartTime = shiftRequest.StartTime;
             shift.EndTime = shiftRequest.EndTime;
 
             await _context.SaveChangesAsync();
 
-            return Result<ShiftResponse>.Ok(MapToShiftResponse(shift, workerResult.Value));
+            return Result<ShiftResponse>.Ok(MapToShiftResponse(shift, worker));
 
         }
         catch (DbUpdateException ex)
@@ -138,18 +137,11 @@ public class ShiftService : IShiftService
         {
             var shifts = await _context.Shifts
                 .AsNoTracking()
-                .Include(shift => shift.WorkerId)
+                .Include(shift => shift.Worker)
                 .ToListAsync();
 
             var shiftResponses = shifts
-                .Select(shift => MapToShiftResponse(shift, new WorkerResponse
-                {
-                    WorkerId = shift.WorkerId,
-                    Name = shift.Worker.Name,
-                    Department = shift.Worker.Department,
-                    Email = shift.Worker.Email,
-                    TelephoneNumber = shift.Worker.TelephoneNumber,
-                }))
+                .Select(shift => MapToShiftResponse(shift, _context.Workers.Find(shift.WorkerId)!))
                 .ToList();
 
             return Result<IReadOnlyList<ShiftResponse>>.Ok(shiftResponses);
@@ -174,18 +166,11 @@ public class ShiftService : IShiftService
             var shifts = await _context.Shifts
                 .AsNoTracking()
                 .Where(shift => shift.WorkerId == workerId)
-                .Include(shift => shift.WorkerId)
+                .Include(shift => shift.Worker)
                 .ToListAsync();
 
             var shiftResponses = shifts
-                .Select(shift => MapToShiftResponse(shift, new WorkerResponse
-                {
-                    WorkerId = shift.WorkerId,
-                    Name = shift.Worker.Name,
-                    Department = shift.Worker.Department,
-                    Email = shift.Worker.Email,
-                    TelephoneNumber = shift.Worker.TelephoneNumber,
-                }))
+                .Select(shift => MapToShiftResponse(shift, _context.Workers.Find(shift.WorkerId)!))
                 .ToList();
 
             return Result<IReadOnlyList<ShiftResponse>>.Ok(shiftResponses);
@@ -211,12 +196,12 @@ public class ShiftService : IShiftService
             if (shift is null)
                 return _logger.LogErrorAndReturnFail<ShiftResponse>($"There is no shift available in the database with id = {id}");
 
-            var workerResponse = await _workerService.GetWorkerByIdAsync(shift.WorkerId);
+            var worker = await _context.Workers.FindAsync(shift.WorkerId);
 
-            if (!workerResponse.IsSuccess || workerResponse.Value is null)
-                return _logger.LogErrorAndReturnFail<ShiftResponse>(workerResponse.ErrorMessage!);
+            if (worker is null)
+                return _logger.LogErrorAndReturnFail<ShiftResponse>($"There is no worker in the database with id = {shift.WorkerId}");
 
-            return Result<ShiftResponse>.Ok(MapToShiftResponse(shift, workerResponse.Value));
+            return Result<ShiftResponse>.Ok(MapToShiftResponse(shift, worker));
 
         }
         catch (Exception ex)
@@ -226,10 +211,10 @@ public class ShiftService : IShiftService
 
     }
 
-    private ShiftResponse MapToShiftResponse(Shift shift, WorkerResponse worker) => new()
+    private static ShiftResponse MapToShiftResponse(Shift shift, Worker worker) => new()
     {
         Id = shift.Id,
-        WorkerId = worker.WorkerId,
+        WorkerId = worker.Id,
         WorkerName = worker.Name,
         WorkerDepartment = worker.Department,
         StartTime = shift.StartTime,

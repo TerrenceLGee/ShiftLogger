@@ -129,7 +129,7 @@ public class WorkerService : IWorkerService
         }
         catch (Exception ex)
         {
-            return _logger.LogErrorAndReturnFail<IReadOnlyList<WorkerResponse>>($"An unexpected error occurred: {ex.Message}", ex);
+            return _logger.LogErrorAndReturnFail<IReadOnlyList<WorkerResponse>>($"An unexpected error occurred while loading workers: {ex.Message}", ex);
         }
 
     }
@@ -154,7 +154,7 @@ public class WorkerService : IWorkerService
         }
         catch (Exception ex)
         {
-            return _logger.LogErrorAndReturnFail<WorkerResponse>($"An unexpected error occurred: {ex.Message}", ex);
+            return _logger.LogErrorAndReturnFail<WorkerResponse>($"An unexpected error occurred while loading workers: {ex.Message}", ex);
         }
 
     }
@@ -177,13 +177,13 @@ public class WorkerService : IWorkerService
         }
         catch (Exception ex)
         {
-            return _logger.LogErrorAndReturnFail<IReadOnlyList<WorkerResponse>>($"An unexpected error occurred: {ex.Message}", ex);
+            return _logger.LogErrorAndReturnFail<IReadOnlyList<WorkerResponse>>($"An unexpected error occurred while loading workers: {ex.Message}", ex);
         }
 
     }
 
 
-    private WorkerResponse MapToResponse(Worker worker) => new()
+    private static WorkerResponse MapToResponse(Worker worker) => new()
     {
         WorkerId = worker.Id,
         Name = worker.Name,

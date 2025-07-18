@@ -1,6 +1,60 @@
 @ShiftLogger.API_HostAddress = http://localhost:5098
 
-GET {{ShiftLogger.API_HostAddress}}/weatherforecast/
+GET {{ShiftLogger.API_HostAddress}}/api/workers
 Accept: application/json
 
 ###
+
+POST {{ShiftLogger.API_HostAddress}}/api/workers
+Content-Type: application/json
+
+{
+  "name":"Jamal Bey",
+  "department": "Wrestling Operations",
+  "email": "crazy_j_bey@proton.me",
+  "telephoneNumber": "904-903-8966"
+}
+###
+
+PUT {{ShiftLogger.API_HostAddress}}/api/workers/1
+Content-Type: application/json
+
+{
+  "id": 1,
+  "name": "Ali Bey",
+  "department": "Porn",
+  "email": "ali_bey@proton.me",
+  "telephoneNumber": "904-777-8939"
+}
+
+### 
+
+DELETE {{ShiftLogger.API_HostAddress}}/api/workers/2
+###
+
+POST {{ShiftLogger.API_HostAddress}}/api/shifts
+Content-Type: application/json 
+
+{
+  "workerId": 1,
+  "startTime": "2025-07-24T01:00:00",
+  "endTime": "2025-07-24T13:00:00"
+}
+###
+
+PUT {{ShiftLogger.API_HostAddress}}/api/shifts/5
+Content-Type: application/json
+
+{
+  "workerId": 1,
+  "startTime": "2025-07-18T01:00:00",
+  "endTime": "2025-07-18T16:00:00"
+}
+### 
+
+GET {{ShiftLogger.API_HostAddress}}/api/shifts/13
+###
+
+GET {{ShiftLogger.API_HostAddress}}/api/shifts/worker/1
+Accept: application/json
+### 
