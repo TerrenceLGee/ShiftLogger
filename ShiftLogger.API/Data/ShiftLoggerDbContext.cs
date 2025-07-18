@@ -21,6 +21,7 @@ public class ShiftLoggerDbContext : DbContext
             .HasOne(s => s.Worker)
             .WithMany()
             .HasForeignKey(s => s.WorkerId)
+            .IsRequired()
             .OnDelete(DeleteBehavior.Cascade);
     }
 }
