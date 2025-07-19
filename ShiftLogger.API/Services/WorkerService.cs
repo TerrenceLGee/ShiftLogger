@@ -18,7 +18,7 @@ public class WorkerService : IWorkerService
         _logger = logger;
     }
 
-    public async Task<Result<WorkerResponse>> CreateWorkerAsync(CreateWorkerRequest workerRequest)
+    public async Task<Result<WorkerResponse>> CreateWorkerAsync(CreateWorkerRequest workerRequest, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -33,9 +33,9 @@ public class WorkerService : IWorkerService
                 TelephoneNumber = workerRequest.TelephoneNumber,
             };
 
-            await _context.Workers.AddAsync(worker);
+            await _context.Workers.AddAsync(worker, cancellationToken);
 
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(cancellationToken);
 
             return Result<WorkerResponse>.Ok(MapToResponse(worker));
         }
@@ -50,7 +50,7 @@ public class WorkerService : IWorkerService
 
     }
 
-    public async Task<Result<WorkerResponse>> UpdateWorkerAsync(int id, UpdateWorkerRequest workerRequest)
+    public async Task<Result<WorkerResponse>> UpdateWorkerAsync(int id, UpdateWorkerRequest workerRequest, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -60,7 +60,7 @@ public class WorkerService : IWorkerService
             if (workerRequest is null)
                 return _logger.LogErrorAndReturnFail<WorkerResponse>("Update worker request cannot be null");
 
-            var worker = await _context.Workers.FindAsync(id);
+            var worker = await _context.Workers.FindAsync(id, cancellationToken);
 
             if (worker is null)
                 return _logger.LogErrorAndReturnFail<WorkerResponse>($"No worker with id = {id} found in the database, nothing updated");
@@ -70,7 +70,7 @@ public class WorkerService : IWorkerService
             worker.Email = workerRequest.Email;
             worker.TelephoneNumber = workerRequest.TelephoneNumber;
 
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(cancellationToken);
 
             return Result<WorkerResponse>.Ok(MapToResponse(worker));
         }
@@ -85,7 +85,7 @@ public class WorkerService : IWorkerService
 
     }
 
-    public async Task<Result> DeleteWorkerAsync(int id)
+    public async Task<Result> DeleteWorkerAsync(int id, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -93,14 +93,14 @@ public class WorkerService : IWorkerService
                 return _logger.LogErrorAndReturnFail($"Id = {id} is an invalid id. Ids must be greater than 0");
 
             var workerToDelete = await _context.Workers
-                .FindAsync(id);
+                .FindAsync(id, cancellationToken);
 
             if (workerToDelete is null)
                 return _logger.LogErrorAndReturnFail($"There is no worker in the database with id = {id}");
 
             _context.Workers.Remove(workerToDelete);
 
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(cancellationToken);
 
             return Result.Ok();
         }
@@ -115,7 +115,7 @@ public class WorkerService : IWorkerService
 
     }
 
-    public async Task<Result<IReadOnlyList<WorkerResponse>>> GetAllWorkersAsync()
+    public async Task<Result<IReadOnlyList<WorkerResponse>>> GetAllWorkersAsync(CancellationToken cancellationToken = default)
     {
         try
         {
@@ -123,7 +123,7 @@ public class WorkerService : IWorkerService
 
             var workers = await query
                 .Select(worker => MapToResponse(worker))
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
 
             return Result<IReadOnlyList<WorkerResponse>>.Ok(workers);
         }
@@ -134,7 +134,7 @@ public class WorkerService : IWorkerService
 
     }
 
-    public async Task<Result<WorkerResponse>> GetWorkerByIdAsync(int id)
+    public async Task<Result<WorkerResponse>> GetWorkerByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -144,7 +144,7 @@ public class WorkerService : IWorkerService
             var query = _context.Workers.AsNoTracking();
 
             var worker = await query
-                .FirstOrDefaultAsync(worker => worker.Id == id);
+                .FirstOrDefaultAsync(worker => worker.Id == id, cancellationToken);
 
             if (worker is null)
                 return _logger.LogErrorAndReturnFail<WorkerResponse>($"There is no worker in the database with id = {id} ");
@@ -159,7 +159,7 @@ public class WorkerService : IWorkerService
 
     }
 
-    public async Task<Result<IReadOnlyList<WorkerResponse>>> SearchWorkersByNameAsync(string name)
+    public async Task<Result<IReadOnlyList<WorkerResponse>>> SearchWorkersByNameAsync(string name, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -171,7 +171,7 @@ public class WorkerService : IWorkerService
             var workersByName = await query
                 .Where(worker => worker.Name.ToLower().Contains(name.ToLower()))
                 .Select(worker => MapToResponse(worker))
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
 
             return Result<IReadOnlyList<WorkerResponse>>.Ok(workersByName);
         }

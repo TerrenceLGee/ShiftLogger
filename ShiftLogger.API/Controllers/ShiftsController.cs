@@ -15,9 +15,9 @@ public class ShiftsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<ShiftResponse>>> GetAllShiftsAsync()
+    public async Task<ActionResult<IReadOnlyList<ShiftResponse>>> GetAllShiftsAsync(CancellationToken cancellationToken)
     {
-        var shiftResult = await _shiftService.GetAllShiftsAsync();
+        var shiftResult = await _shiftService.GetAllShiftsAsync(cancellationToken);
 
         return shiftResult.IsSuccess
             ? Ok(shiftResult.Value)
@@ -25,9 +25,9 @@ public class ShiftsController : ControllerBase
     }
 
     [HttpGet("worker/{workerId}")]
-    public async Task<ActionResult<IReadOnlyList<ShiftResponse>>> GetAllShiftsByWorkerIdAsync(int workerId)
+    public async Task<ActionResult<IReadOnlyList<ShiftResponse>>> GetAllShiftsByWorkerIdAsync(int workerId, CancellationToken cancellationToken)
     {
-        var shiftResult = await _shiftService.GetAllShiftsByWorkerId(workerId);
+        var shiftResult = await _shiftService.GetAllShiftsByWorkerId(workerId, cancellationToken);
 
         return shiftResult.IsSuccess
             ? Ok(shiftResult.Value)
@@ -35,9 +35,9 @@ public class ShiftsController : ControllerBase
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<ShiftResponse>> GetShiftByIdAsync(int id)
+    public async Task<ActionResult<ShiftResponse>> GetShiftByIdAsync(int id, CancellationToken cancellationToken)
     {
-        var shiftResult = await _shiftService.GetShiftByIdAsync(id);
+        var shiftResult = await _shiftService.GetShiftByIdAsync(id, cancellationToken);
 
         return shiftResult.IsSuccess
             ? Ok(shiftResult.Value)
@@ -45,9 +45,9 @@ public class ShiftsController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<ShiftResponse>> CreateShiftAsync(CreateShiftRequest shiftRequest)
+    public async Task<ActionResult<ShiftResponse>> CreateShiftAsync(CreateShiftRequest shiftRequest, CancellationToken cancellationToken)
     {
-        var shiftResult = await _shiftService.CreateShiftAsync(shiftRequest);
+        var shiftResult = await _shiftService.CreateShiftAsync(shiftRequest, cancellationToken);
 
         if (shiftResult.IsSuccess)
         {
@@ -59,9 +59,9 @@ public class ShiftsController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    public async Task<ActionResult<ShiftResponse>> UpdateShiftAsync(int id, UpdateShiftRequest shiftRequest)
+    public async Task<ActionResult<ShiftResponse>> UpdateShiftAsync(int id, UpdateShiftRequest shiftRequest, CancellationToken cancellationToken)
     {
-        var shiftResult = await _shiftService.UpdateShiftAsync(id, shiftRequest);
+        var shiftResult = await _shiftService.UpdateShiftAsync(id, shiftRequest, cancellationToken);
 
         return shiftResult.IsSuccess
             ? Ok(shiftResult.Value)
@@ -69,9 +69,9 @@ public class ShiftsController : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    public async Task<ActionResult> DeleteShiftAsync(int id)
+    public async Task<ActionResult> DeleteShiftAsync(int id, CancellationToken cancellationToken)
     {
-        var shiftResult = await _shiftService.DeleteShiftAsync(id);
+        var shiftResult = await _shiftService.DeleteShiftAsync(id, cancellationToken);
 
         return shiftResult.IsSuccess
             ? NoContent()

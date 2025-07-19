@@ -52,9 +52,13 @@ Content-Type: application/json
 }
 ### 
 
-GET {{ShiftLogger.API_HostAddress}}/api/shifts/3
+GET {{ShiftLogger.API_HostAddress}}/api/workers?name=Ali%20Bey
 ###
 
 GET {{ShiftLogger.API_HostAddress}}/api/shifts/worker/1
 Accept: application/json
 ### 
+
+
+GET {{ShiftLogger.API_HostAddress}}/api/workers?id=1
+###

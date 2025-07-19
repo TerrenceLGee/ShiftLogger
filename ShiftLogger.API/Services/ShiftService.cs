@@ -18,7 +18,7 @@ public class ShiftService : IShiftService
         _logger = logger;
     }
 
-    public async Task<Result<ShiftResponse>> CreateShiftAsync(CreateShiftRequest shiftRequest)
+    public async Task<Result<ShiftResponse>> CreateShiftAsync(CreateShiftRequest shiftRequest, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -28,7 +28,7 @@ public class ShiftService : IShiftService
             if (shiftRequest.StartTime >= shiftRequest.EndTime)
                 return _logger.LogErrorAndReturnFail<ShiftResponse>("Start time must come before end time");
 
-            var worker = await _context.Workers.FindAsync(shiftRequest.WorkerId);
+            var worker = await _context.Workers.FindAsync(shiftRequest.WorkerId, cancellationToken);
             if (worker is null)
                 return _logger.LogErrorAndReturnFail<ShiftResponse>($"There is no worker in the database with id = {shiftRequest.WorkerId}");
 
@@ -39,13 +39,13 @@ public class ShiftService : IShiftService
                 EndTime = shiftRequest.EndTime,
             };
 
-            await _context.Shifts.AddAsync(shift);
+            await _context.Shifts.AddAsync(shift, cancellationToken);
 
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(cancellationToken);
 
             var fullShift = await _context.Shifts
                 .Include(shift => shift.Worker)
-                .FirstAsync(s => s.Id == shift.Id);
+                .FirstAsync(s => s.Id == shift.Id, cancellationToken);
 
             return Result<ShiftResponse>.Ok(MapToShiftResponse(fullShift));
         }
@@ -59,7 +59,7 @@ public class ShiftService : IShiftService
         }
     }
 
-    public async Task<Result<ShiftResponse>> UpdateShiftAsync(int shiftId, UpdateShiftRequest shiftRequest)
+    public async Task<Result<ShiftResponse>> UpdateShiftAsync(int shiftId, UpdateShiftRequest shiftRequest, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -72,12 +72,12 @@ public class ShiftService : IShiftService
             if (shiftRequest.StartTime >= shiftRequest.EndTime)
                 return _logger.LogErrorAndReturnFail<ShiftResponse>("Start time must come before end time");
 
-            var shift = await _context.Shifts.FindAsync(shiftId);
+            var shift = await _context.Shifts.FindAsync(shiftId, cancellationToken);
 
             if (shift is null)
                 return _logger.LogErrorAndReturnFail<ShiftResponse>($"There is no shift with id = {shiftId} available in the database, nothing updated");
 
-            var worker = await _context.Workers.FindAsync(shiftRequest.WorkerId);
+            var worker = await _context.Workers.FindAsync(shiftRequest.WorkerId, cancellationToken);
 
             if (worker is null)
                 return _logger.LogErrorAndReturnFail<ShiftResponse>($"There is no worker in the database with id = {shiftRequest.WorkerId}");
@@ -86,7 +86,7 @@ public class ShiftService : IShiftService
             shift.StartTime = shiftRequest.StartTime;
             shift.EndTime = shiftRequest.EndTime;
 
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(cancellationToken);
 
             return Result<ShiftResponse>.Ok(MapToShiftResponse(shift));
 
@@ -102,7 +102,7 @@ public class ShiftService : IShiftService
 
     }
 
-    public async Task<Result> DeleteShiftAsync(int id)
+    public async Task<Result> DeleteShiftAsync(int id, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -110,14 +110,14 @@ public class ShiftService : IShiftService
                 return _logger.LogErrorAndReturnFail($"Id = {id} is invalid, shift ids must be greater than 0");
 
             var shiftToDelete = await _context.Shifts
-               .FindAsync(id);
+               .FindAsync(id, cancellationToken);
 
             if (shiftToDelete is null)
                 return _logger.LogErrorAndReturnFail($"Shift with id = {id} is not in the database, nothing deleted");
 
             _context.Shifts.Remove(shiftToDelete);
 
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(cancellationToken);
 
             return Result.Ok();
         }
@@ -132,7 +132,7 @@ public class ShiftService : IShiftService
 
     }
 
-    public async Task<Result<IReadOnlyList<ShiftResponse>>> GetAllShiftsAsync()
+    public async Task<Result<IReadOnlyList<ShiftResponse>>> GetAllShiftsAsync(CancellationToken cancellationToken = default)
     {
 
         try
@@ -140,7 +140,7 @@ public class ShiftService : IShiftService
             var shifts = await _context.Shifts
                 .AsNoTracking()
                 .Include(shift => shift.Worker)
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
 
             var shiftResponses = shifts
                 .Select(shift => MapToShiftResponse(shift))
@@ -156,7 +156,7 @@ public class ShiftService : IShiftService
 
     }
 
-    public async Task<Result<IReadOnlyList<ShiftResponse>>> GetAllShiftsByWorkerId(int workerId)
+    public async Task<Result<IReadOnlyList<ShiftResponse>>> GetAllShiftsByWorkerId(int workerId, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -167,7 +167,7 @@ public class ShiftService : IShiftService
                 .AsNoTracking()
                 .Where(shift => shift.WorkerId == workerId)
                 .Include(shift => shift.Worker)
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
 
             var shiftResponses = shifts
                 .Select(shift => MapToShiftResponse(shift))
@@ -183,7 +183,7 @@ public class ShiftService : IShiftService
 
     }
 
-    public async Task<Result<ShiftResponse>> GetShiftByIdAsync(int id)
+    public async Task<Result<ShiftResponse>> GetShiftByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -191,12 +191,12 @@ public class ShiftService : IShiftService
                 return _logger.LogErrorAndReturnFail<ShiftResponse>($"Shift id = {id} is invalid, shift ids must be greater than 0");
 
             var shift = await _context.Shifts
-                .FirstOrDefaultAsync(shift => shift.Id == id);
+                .FirstOrDefaultAsync(shift => shift.Id == id, cancellationToken);
 
             if (shift is null)
                 return _logger.LogErrorAndReturnFail<ShiftResponse>($"There is no shift available in the database with id = {id}");
 
-            var worker = await _context.Workers.FindAsync(shift.WorkerId);
+            var worker = await _context.Workers.FindAsync(shift.WorkerId, cancellationToken);
 
             if (worker is null)
                 return _logger.LogErrorAndReturnFail<ShiftResponse>($"There is no worker in the database with id = {shift.WorkerId}");

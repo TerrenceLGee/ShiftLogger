@@ -16,11 +16,11 @@ public class WorkersController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<WorkerResponse>>> GetAllWorkersAsync([FromQuery] string? name)
+    public async Task<ActionResult<IReadOnlyList<WorkerResponse>>> GetAllWorkersAsync([FromQuery] string? name, CancellationToken cancellationToken)
     {
         var workersResult = string.IsNullOrEmpty(name)
-            ? await _workerService.GetAllWorkersAsync()
-            : await _workerService.SearchWorkersByNameAsync(name);
+            ? await _workerService.GetAllWorkersAsync(cancellationToken)
+            : await _workerService.SearchWorkersByNameAsync(name, cancellationToken);
 
         return workersResult.IsSuccess
             ? Ok(workersResult.Value)
@@ -28,9 +28,9 @@ public class WorkersController : ControllerBase
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<WorkerResponse>> GetWorkerByIdAsync(int id)
+    public async Task<ActionResult<WorkerResponse>> GetWorkerByIdAsync(int id, CancellationToken cancellationToken)
     {
-        var workerResult = await _workerService.GetWorkerByIdAsync(id);
+        var workerResult = await _workerService.GetWorkerByIdAsync(id, cancellationToken);
 
         return workerResult.IsSuccess
             ? Ok(workerResult.Value)
@@ -38,9 +38,9 @@ public class WorkersController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<WorkerResponse>> CreateWorkerAsync(CreateWorkerRequest worker)
+    public async Task<ActionResult<WorkerResponse>> CreateWorkerAsync(CreateWorkerRequest worker, CancellationToken cancellationToken)
     {
-        var workerResult = await _workerService.CreateWorkerAsync(worker);
+        var workerResult = await _workerService.CreateWorkerAsync(worker, cancellationToken);
 
         if (workerResult.IsSuccess)
         {
@@ -52,9 +52,9 @@ public class WorkersController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    public async Task<ActionResult<WorkerResponse>> UpdateWorkerAsync(int id, UpdateWorkerRequest worker)
+    public async Task<ActionResult<WorkerResponse>> UpdateWorkerAsync(int id, UpdateWorkerRequest worker, CancellationToken cancellationToken)
     {
-        var workerResult = await _workerService.UpdateWorkerAsync(id, worker);
+        var workerResult = await _workerService.UpdateWorkerAsync(id, worker, cancellationToken);
 
         return workerResult.IsSuccess
             ? Ok(workerResult.Value)
@@ -62,9 +62,9 @@ public class WorkersController : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    public async Task<ActionResult> DeleteWorkerAsync(int id)
+    public async Task<ActionResult> DeleteWorkerAsync(int id, CancellationToken cancellationToken)
     {
-        var workerResult = await _workerService.DeleteWorkerAsync(id);
+        var workerResult = await _workerService.DeleteWorkerAsync(id, cancellationToken);
 
         return workerResult.IsSuccess
             ? NoContent()

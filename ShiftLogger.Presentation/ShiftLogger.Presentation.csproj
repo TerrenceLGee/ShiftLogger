@@ -8,7 +8,9 @@
   </PropertyGroup>
 
 	<ItemGroup>
+		<PackageReference Include="RestSharp" Version="112.1.0" />
 		<PackageReference Include="Spectre.Console" Version="0.50.0" />
+		<PackageReference Include="System.Text.Json" Version="9.0.7" />
 	</ItemGroup>
 
 	<ItemGroup>
