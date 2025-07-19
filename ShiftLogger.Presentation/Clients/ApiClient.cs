@@ -34,7 +34,15 @@ public class ApiClient : IApiClient
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
 
-            var apiResponse = JsonSerializer.Deserialize<ShiftResponse>(response)
+            var apiData = JsonSerializer.Deserialize<ShiftResponse>(json);
+
+            return (apiData is null)
+                ? _logger.LogErrorAndReturnFail<ShiftResponse>("There was an error creating the worker")
+                : Result<ShiftResponse>.Ok(apiData);
+        }
+        catch (HttpRequestException ex)
+        {
+            return _logger.LogErrorAndReturnFail<ShiftResponse>($"Network error: {ex.Message} ");
         }
         
     }
