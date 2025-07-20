@@ -20,32 +20,46 @@ public class ApiClient : IApiClient
         _httpClient = httpClientFactory.CreateClient("Api");
         _logger = logger;
     }
-    public Task<Result<ShiftResponse>> CreateShiftAsync(CreateShiftRequest request, CancellationToken cancellationToken = default) => SendAsync<ShiftResponse>(() => _httpClient.PostAsJsonAsync(ShiftsPath, request, cancellationToken), cancellationToken);
+    public Task<Result<ShiftResponse>> CreateShiftAsync(CreateShiftRequest request, CancellationToken cancellationToken = default) => SendAsync<ShiftResponse>(
+        HttpMethod.Post, ShiftsPath, request, cancellationToken);
 
 
-    public Task<Result<ShiftResponse>> UpdateShiftAsync(int id, UpdateShiftRequest request, CancellationToken cancellationToken = default) => SendAsync<ShiftResponse>(() => _httpClient.PutAsJsonAsync($"{ShiftsPath}/{id}", request, cancellationToken), cancellationToken);
+    public Task<Result<ShiftResponse>> UpdateShiftAsync(int id, UpdateShiftRequest request, CancellationToken cancellationToken = default) => SendAsync<ShiftResponse>(
+        HttpMethod.Put, $"{ShiftsPath}/{id}", request, cancellationToken);
 
 
-    public Task<Result> DeleteShiftAsync(int id, CancellationToken cancellationToken = default) => DeleteAsync(() => _httpClient.DeleteAsync($"{ShiftsPath}/{id}", cancellationToken), cancellationToken);
+    public Task<Result> DeleteShiftAsync(int id, CancellationToken cancellationToken = default) => SendAsync(HttpMethod.Delete, $"{ShiftsPath}/{id}", cancellationToken);
 
 
-    public Task<Result<ShiftResponse>> GetShiftByIdAsync(int id, CancellationToken cancellationToken = default) => SendGetAsync<ShiftResponse>(() => _httpClient.GetAsync($"{ShiftsPath}/{id}", cancellationToken), cancellationToken);
+    public Task<Result<ShiftResponse>> GetShiftByIdAsync(int id, CancellationToken cancellationToken = default) => SendAsync<ShiftResponse>(
+        HttpMethod.Get, $"{ShiftsPath}/{id}", cancellationToken);
 
 
-    public Task<Result<IReadOnlyList<ShiftResponse>>> GetShiftsAsync(int? workerId, CancellationToken cancellationToken = default) => SendGetAsync<IReadOnlyList<ShiftResponse>>(() => _httpClient.GetAsync(workerId is null ? ShiftsPath : $"{ShiftsPath}/worker/{workerId}", cancellationToken), cancellationToken);
+    public Task<Result<IReadOnlyList<ShiftResponse>>> GetShiftsAsync(int? workerId, CancellationToken cancellationToken = default)
+    {
+        var url = (workerId is null)
+            ? ShiftsPath
+            : $"{ShiftsPath}/worker/{workerId}";
+
+        return SendAsync<IReadOnlyList<ShiftResponse>>(
+            HttpMethod.Get, url, cancellationToken);
+    }
 
 
-    public Task<Result<WorkerResponse>> CreateWorkerAsync(CreateWorkerRequest request, CancellationToken cancellationToken = default) => SendAsync<WorkerResponse>(() => _httpClient.PostAsJsonAsync(WorkersPath, request, cancellationToken), cancellationToken);
+    public Task<Result<WorkerResponse>> CreateWorkerAsync(CreateWorkerRequest request, CancellationToken cancellationToken = default) => SendAsync<WorkerResponse>(
+        HttpMethod.Post, WorkersPath, request, cancellationToken);
 
 
 
-    public Task<Result<WorkerResponse>> UpdateWorkerAsync(int id, UpdateWorkerRequest request, CancellationToken cancellationToken = default) => SendAsync<WorkerResponse>(() => _httpClient.PutAsJsonAsync($"{WorkersPath}/{id}", request, cancellationToken), cancellationToken);
+    public Task<Result<WorkerResponse>> UpdateWorkerAsync(int id, UpdateWorkerRequest request, CancellationToken cancellationToken = default) => SendAsync<WorkerResponse>(
+        HttpMethod.Put, $"{WorkersPath}/{id}", request, cancellationToken);
 
 
-    public Task<Result> DeleteWorkerAsync(int id, CancellationToken cancellationToken = default) => DeleteAsync(() => _httpClient.DeleteAsync($"{WorkersPath}/{id}", cancellationToken), cancellationToken);
+    public Task<Result> DeleteWorkerAsync(int id, CancellationToken cancellationToken = default) => SendAsync(HttpMethod.Delete, $"{WorkersPath}/{id}", cancellationToken);
 
 
-    public Task<Result<WorkerResponse>> GetWorkerByIdAsync(int id, CancellationToken cancellationToken = default) => SendGetAsync<WorkerResponse>(() => _httpClient.GetAsync($"{WorkersPath}/{id}", cancellationToken), cancellationToken);
+    public Task<Result<WorkerResponse>> GetWorkerByIdAsync(int id, CancellationToken cancellationToken = default) => SendAsync<WorkerResponse>(
+        HttpMethod.Get, $"{WorkersPath}/{id}", cancellationToken);
 
 
     public Task<Result<IReadOnlyList<WorkerResponse>>> GetWorkersAsync(string? nameFilter = null, CancellationToken cancellationToken = default)
@@ -54,30 +68,29 @@ public class ApiClient : IApiClient
             ? WorkersPath
             : QueryHelpers.AddQueryString(WorkersPath, "name", nameFilter!);
 
-        return SendGetAsync<IReadOnlyList<WorkerResponse>>(() => _httpClient.GetAsync(url, cancellationToken), cancellationToken);
+        return SendAsync<IReadOnlyList<WorkerResponse>>(
+            HttpMethod.Get, url, cancellationToken);
     }
 
 
     private async Task<Result<T>> SendAsync<T>(
-        Func<Task<HttpResponseMessage>> send, CancellationToken cancellationToken)
+        HttpMethod method,
+        string url,
+        object? payload = null,
+        CancellationToken cancellationToken = default)
     {
+        using var request = new HttpRequestMessage(method, url);
+
+        if (payload is not null)
+        {
+            request.Content = JsonContent.Create(payload);
+        }
+
         HttpResponseMessage response;
 
         try
         {
-            response = await send();
-
-            if (!response.IsSuccessStatusCode)
-            {
-                var error = await response.Content.ReadAsStringAsync(cancellationToken);
-                return _logger.LogErrorAndReturnFail<T>($"API {(int)response.StatusCode}: {error}");
-            }
-
-            T? responseBody = await response.Content.ReadFromJsonAsync<T>(cancellationToken);
-
-            return (responseBody is null)
-                ? _logger.LogErrorAndReturnFail<T>($"Empty response body")
-                : Result<T>.Ok(responseBody);
+            response = await _httpClient.SendAsync(request, cancellationToken);
         }
         catch (HttpRequestException ex)
         {
@@ -87,32 +100,50 @@ public class ApiClient : IApiClient
         {
             return _logger.LogErrorAndReturnFail<T>($"Request timeout: {ex.Message}");
         }
-        catch (JsonException ex)
-        {
-            return _logger.LogErrorAndReturnFail<T>($"Json parsing error: {ex.Message}");
-        }
         catch (Exception ex)
         {
             return _logger.LogErrorAndReturnFail<T>($"An unexpected error occurred: {ex.Message}");
         }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await response.Content.ReadAsStringAsync(cancellationToken);
+            return _logger.LogErrorAndReturnFail<T>($"API returned: {(int)response.StatusCode}: {error}");
+        }
+
+        T? responseBody;
+        try
+        {
+            responseBody = await response.Content.ReadFromJsonAsync<T>(cancellationToken);
+        }
+        catch (JsonException ex)
+        {
+            return _logger.LogErrorAndReturnFail<T>($"JSON parse error: {ex.Message}");
+        }
+
+        return (responseBody is null)
+            ? _logger.LogErrorAndReturnFail<T>("Empty response body")
+            : Result<T>.Ok(responseBody);
     }
 
-    private async Task<Result> DeleteAsync(
-        Func<Task<HttpResponseMessage>> send, CancellationToken cancellationToken)
+    private async Task<Result> SendAsync(
+        HttpMethod method,
+        string url,
+        object? payload = null,
+        CancellationToken cancellationToken = default)
     {
+        using var request = new HttpRequestMessage(method, url);
+
+        if (payload is not null)
+        {
+            request.Content = JsonContent.Create(payload);
+        }
+
         HttpResponseMessage response;
 
         try
         {
-            response = await send();
-
-            if (!response.IsSuccessStatusCode)
-            {
-                var error = await response.Content.ReadAsStringAsync(cancellationToken);
-                return _logger.LogErrorAndReturnFail($"API {(int)response.StatusCode}: {error}");
-            }
-
-            return Result.Ok();
+            response = await _httpClient.SendAsync(request, cancellationToken);
         }
         catch (HttpRequestException ex)
         {
@@ -126,46 +157,13 @@ public class ApiClient : IApiClient
         {
             return _logger.LogErrorAndReturnFail($"An unexpected error occurred: {ex.Message}");
         }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await response.Content.ReadAsStringAsync(cancellationToken);
+            return _logger.LogErrorAndReturnFail($"API returned: {(int)response.StatusCode}: {error}");
+        }
+        return Result.Ok();
     }
-
-    private async Task<Result<T>> SendGetAsync<T>(
-        Func<Task<HttpResponseMessage>> get, CancellationToken cancellationToken)
-    {
-        HttpResponseMessage response;
-
-        try
-        {
-            response = await get();
-
-            if (!response.IsSuccessStatusCode)
-            {
-                var error = await response.Content.ReadAsStringAsync(cancellationToken);
-                return _logger.LogErrorAndReturnFail<T>($"API returned: {(int)response.StatusCode}: {error}");
-            }
-
-            var retrieved = await response.Content.ReadFromJsonAsync<T>(cancellationToken);
-
-            return (retrieved is null)
-                ? _logger.LogErrorAndReturnFail<T>("Empty response body")
-                : Result<T>.Ok(retrieved);
-        }
-        catch (HttpRequestException ex)
-        {
-            return _logger.LogErrorAndReturnFail<T>($"Network error: {ex.Message} ");
-        }
-        catch (TaskCanceledException ex)
-        {
-            return _logger.LogErrorAndReturnFail<T>($"Request timeout: {ex.Message}");
-        }
-        catch (JsonException ex)
-        {
-            return _logger.LogErrorAndReturnFail<T>($"Json parsing error: {ex.Message}");
-        }
-        catch (Exception ex)
-        {
-            return _logger.LogErrorAndReturnFail<T>($"An unexpected error occurred: {ex.Message}");
-        }
-    }
-
 }
 
