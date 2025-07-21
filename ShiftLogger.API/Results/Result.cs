@@ -1,4 +1,6 @@
-﻿namespace ShiftLogger.API.Results;
+﻿using System.Diagnostics.CodeAnalysis;
+
+namespace ShiftLogger.API.Results;
 
 public class Result
 {
@@ -37,6 +39,7 @@ public class Result<T> : Result
         Value = default;
     }
 
+    [MemberNotNull(nameof(Value))]
     public static Result<T> Ok(T value) => new Result<T>(value);
     public new static Result<T> Fail(string message) => new Result<T>(message);
 }
