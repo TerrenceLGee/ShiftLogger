@@ -13,6 +13,7 @@ public class ShiftLoggerUI : IShiftLoggerUI
 {
     private readonly IApiClient _apiClient;
     private const string DateFormat = "MM-dd-yyyy hh:mm";
+    private const string DurationFormat = @"hh\:mm";
 
     public ShiftLoggerUI(IApiClient apiClient)
     {
@@ -95,7 +96,7 @@ public class ShiftLoggerUI : IShiftLoggerUI
         var createdWorker = createdWorkerResult.Value!;
 
         var creationResult = await ApiCallWithSpinnerAsync(
-            $"Creating worker [yellow]{name}[/]...", cancellationToken =>
+            $"[yellow]Creating worker {name}[/]...", cancellationToken =>
             _apiClient.CreateWorkerAsync(createdWorker, cancellationToken), cancellationToken);
 
         if (!creationResult.IsSuccess)
@@ -104,7 +105,9 @@ public class ShiftLoggerUI : IShiftLoggerUI
             return;
         }
 
-        DisplayMessage($"Successfully added worker with id = {creationResult.Value!.WorkerId}.", "green");
+        var created = creationResult.Value!;
+
+        DisplayMessage($"Successfully added worker with id = {created.WorkerId}.", "green");
     }
 
     private async Task UpdateWorkerAsync(CancellationToken cancellationToken = default)
@@ -145,7 +148,7 @@ public class ShiftLoggerUI : IShiftLoggerUI
 
         var updatedWorker = updatedWorkerResult.Value!;
 
-        var updateWorkerResult = await ApiCallWithSpinnerAsync($"Updating worker [yellow]{workerId}[/]...", cancellationToken => _apiClient.UpdateWorkerAsync(workerId, updatedWorker, cancellationToken), cancellationToken);
+        var updateWorkerResult = await ApiCallWithSpinnerAsync($"[yellow]Updating worker {workerId}[/]...", cancellationToken => _apiClient.UpdateWorkerAsync(workerId, updatedWorker, cancellationToken), cancellationToken);
 
         if (!updatedWorkerResult.IsSuccess)
         {
@@ -175,7 +178,7 @@ public class ShiftLoggerUI : IShiftLoggerUI
         }
 
         var deletionResult = await ApiCallWithSpinnerAsync(
-            $"Deleting worker [yellow]{workerId}[/]...", 
+            $"[yellow]Deleting worker {workerId}[/]...", 
             cancellationToken => _apiClient.DeleteWorkerAsync(workerId, cancellationToken), cancellationToken);
 
         if (!deletionResult.IsSuccess)
@@ -200,7 +203,7 @@ public class ShiftLoggerUI : IShiftLoggerUI
         }
 
         var workerRetrievalResult = await ApiCallWithSpinnerAsync(
-            $"Retrieving information for worker [yellow]{workerId}[/]",
+            $"[yellow]Retrieving information for worker {workerId}[/]",
             cancellationToken => _apiClient.GetWorkerByIdAsync(workerId, cancellationToken), cancellationToken);
 
         if (!workerRetrievalResult.IsSuccess || workerRetrievalResult.Value is null)
@@ -209,14 +212,16 @@ public class ShiftLoggerUI : IShiftLoggerUI
             return;
         }
 
-        DisplayWorker(workerRetrievalResult.Value);
+        var retrieved = workerRetrievalResult.Value;
+
+        DisplayWorker(retrieved);
     }
 
     private async Task ShowWorkerByNameAsync(CancellationToken cancellationToken = default)
     {
         await ShowWorkersAsync(cancellationToken);
 
-        var name = GetInput<string>("Enter the name of the worker to see detailed information for: ");
+        var name = GetInput<string>("Enter the name of the worker to see detailed information for: ").Trim();
 
         if (!ValidateInfo.IsValidInputString(name))
         {
@@ -225,7 +230,7 @@ public class ShiftLoggerUI : IShiftLoggerUI
         }
 
         var retrievalResult = await ApiCallWithSpinnerAsync(
-            $"Retrieving worker [yellow]{name}[/]...",
+            $"[yellow]Retrieving worker {name}[/]...",
             cancellationToken => _apiClient.GetWorkersAsync(name, cancellationToken), cancellationToken);
 
         if (!retrievalResult.IsSuccess)
@@ -234,13 +239,18 @@ public class ShiftLoggerUI : IShiftLoggerUI
             return;
         }
 
-        DisplayWorkers(retrievalResult.Value!);
+        var retrieved = retrievalResult.Value!;
+
+        if (HandleNoData(retrieved, $"worker matching the name {name}")) 
+            return;
+        
+        DisplayWorkers(retrieved);
     }
 
     private async Task ShowWorkersAsync(CancellationToken cancellationToken = default)
     {
         var retrievalResult = await ApiCallWithSpinnerAsync(
-            $"Retrieving workers...", 
+            $"[yellow]Retrieving workers...[/]", 
             cancellationToken => _apiClient.GetWorkersAsync(null, cancellationToken), cancellationToken);
 
 
@@ -250,7 +260,12 @@ public class ShiftLoggerUI : IShiftLoggerUI
             return;
         }
 
-        DisplayWorkers(retrievalResult.Value!);
+        var retrieved = retrievalResult.Value!;
+
+        if (HandleNoData(retrieved, "workers"))
+            return;
+
+        DisplayWorkers(retrieved);
     }
 
     private async Task CreateShiftAsync(CancellationToken cancellationToken = default)
@@ -258,6 +273,12 @@ public class ShiftLoggerUI : IShiftLoggerUI
         await ShowWorkersAsync(cancellationToken);
 
         var workerId = GetInput<int>("Enter the id of the worker to log a shift for: ");
+
+        if (!ValidateInfo.IsValidNumericInput(workerId))
+        {
+            DisplayMessage("Worker id must be greater than 0", "yellow");
+            return;
+        }
 
         var startTimeDateString = GetInput<string>($"Enter the start time in format: {DateFormat}: ");
 
@@ -293,7 +314,7 @@ public class ShiftLoggerUI : IShiftLoggerUI
         var createdShift = createShiftResult.Value!;
 
         var creationResult = await ApiCallWithSpinnerAsync(
-            $"Creating shift for worker [yellow]{workerId}[/]...", 
+            $"[yellow]Creating shift for worker {workerId}[/]...", 
             cancellationToken => _apiClient.CreateShiftAsync(createdShift, cancellationToken), cancellationToken);
 
         if (!creationResult.IsSuccess)
@@ -302,7 +323,9 @@ public class ShiftLoggerUI : IShiftLoggerUI
             return;
         }
 
-        DisplayMessage($"Shift for worker with id = {workerId} added.", "green");
+        var created = creationResult.Value!;
+
+        DisplayMessage($"Shift for worker with id = {created.WorkerId} added.", "green");
     }
 
     private async Task UpdateShiftAsync(CancellationToken cancellationToken = default)
@@ -351,7 +374,7 @@ public class ShiftLoggerUI : IShiftLoggerUI
         var updateShift = updateShiftResult.Value!;
 
         var updateResult = await ApiCallWithSpinnerAsync(
-            $"Updating shift for worker [yellow]{workerId}[/]...",
+            $"[yellow]Updating shift for worker {workerId}[/]...",
             cancellationToken => _apiClient.UpdateShiftAsync(workerId, updateShift, cancellationToken), cancellationToken);
 
         if (!updateResult.IsSuccess)
@@ -382,7 +405,7 @@ public class ShiftLoggerUI : IShiftLoggerUI
         }
 
         var deletionResult = await ApiCallWithSpinnerAsync(
-            $"Delete shift [yellow]{shiftId}[/]...", 
+            $"[yellow]Delete shift {shiftId}[/]...", 
             cancellationToken => _apiClient.DeleteShiftAsync(shiftId, cancellationToken), cancellationToken);
 
         if (!deletionResult.IsSuccess)
@@ -407,7 +430,7 @@ public class ShiftLoggerUI : IShiftLoggerUI
         }
 
         var retrievalResult = await ApiCallWithSpinnerAsync(
-            $"Retrieving shifts with id [yellow]{shiftId}[/]...",
+            $"[yellow]Retrieving shifts with id {shiftId}[/]...",
             cancellationToken => _apiClient.GetShiftByIdAsync(shiftId, cancellationToken), cancellationToken);
 
         if (!retrievalResult.IsSuccess)
@@ -416,13 +439,15 @@ public class ShiftLoggerUI : IShiftLoggerUI
             return;
         }
 
-        DisplayShift(retrievalResult.Value!);
+        var retrieved = retrievalResult.Value!;
+
+        DisplayShift(retrieved);
     }
 
     private async Task ShowShiftsAsync(CancellationToken cancellationToken = default)
     {
         var retrievalResult = await ApiCallWithSpinnerAsync(
-            $"Retrieving shifts...",
+            $"[yellow]Retrieving shifts...[/]",
             cancellationToken => _apiClient.GetShiftsAsync(null, cancellationToken), cancellationToken);
 
         if (!retrievalResult.IsSuccess)
@@ -431,7 +456,18 @@ public class ShiftLoggerUI : IShiftLoggerUI
             return;
         }
 
-        DisplayShifts(retrievalResult.Value!);
+        if (retrievalResult.Value!.Count == 0)
+        {
+            DisplayMessage("There are no shifts to display", "yellow");
+            return;
+        }
+
+        var retrieved = retrievalResult.Value!;
+
+        if (HandleNoData(retrieved, "shifts"))
+            return;
+
+        DisplayShifts(retrieved);
     }
 
     private async Task ShowShiftsByWorkerIdAsync(CancellationToken cancellationToken = default)
@@ -447,7 +483,7 @@ public class ShiftLoggerUI : IShiftLoggerUI
         }
 
         var retrievalResult = await ApiCallWithSpinnerAsync(
-            $"Retrieving shifts for worker [yellow]{workerId}[/]...",
+            $"[yellow]Retrieving shifts for worker {workerId}[/]...",
             cancellationToken => _apiClient.GetShiftsAsync(workerId, cancellationToken), cancellationToken);
 
         if (!retrievalResult.IsSuccess)
@@ -456,7 +492,12 @@ public class ShiftLoggerUI : IShiftLoggerUI
             return;
         }
 
-        DisplayShifts(retrievalResult.Value!);
+        var retrieved = retrievalResult.Value!;
+
+        if (HandleNoData(retrieved, $"shifts for worker {workerId}"))
+            return;
+
+        DisplayShifts(retrieved);
     }
 
     private T GetInput<T>(string message, string color = "teal")
@@ -474,6 +515,16 @@ public class ShiftLoggerUI : IShiftLoggerUI
         return AnsiConsole.Confirm($"[{color}]{optional}[/]");
     }
 
+    private bool HandleNoData<T>(IReadOnlyList<T> items, string itemType)
+    {
+        if (items.Count == 0)
+        {
+            DisplayMessage($"No {itemType} found", "yellow");
+            return true;
+        }
+        return false;
+    }
+
     private void DisplayWorker(WorkerResponse worker)
     {
         DisplayMessage($"Information for worker {worker.WorkerId}:", "blue");
@@ -485,15 +536,13 @@ public class ShiftLoggerUI : IShiftLoggerUI
 
     private void DisplayShift(ShiftResponse shift)
     {
-        var durationInfo = $"{(int)shift.Duration.TotalHours} hours, {shift.Duration.TotalMinutes % 60} minutes";
-
         DisplayMessage($"Information for shift {shift.Id}", "blue");
         DisplayMessage($"Worker id: {shift.WorkerId}", "blue");
         DisplayMessage($"Worker name: {shift.WorkerName}", "blue");
         DisplayMessage($"Worker department: {shift.WorkerDepartment}", "blue");
         DisplayMessage($"Shift start time: {shift.StartTime.ToString(DateFormat)}", "blue");
         DisplayMessage($"Shift end time: {shift.EndTime.ToString(DateFormat)}", "blue");
-        DisplayMessage($"Shift duration: {durationInfo}", "blue");
+        DisplayMessage($"Shift duration: {shift.Duration.ToString(DurationFormat)}", "blue");
     }
 
     public void DisplayWorkers(IReadOnlyList<WorkerResponse> workers)
@@ -535,8 +584,6 @@ public class ShiftLoggerUI : IShiftLoggerUI
 
         foreach (var shift in shifts)
         {
-            var durationInfo = $"{(int)shift.Duration.TotalHours} hours, {shift.Duration.TotalMinutes % 60} minutes";
-
             table.AddRow(
                 shift.Id.ToString(),
                 shift.WorkerId.ToString(),
@@ -544,7 +591,7 @@ public class ShiftLoggerUI : IShiftLoggerUI
                 shift.WorkerDepartment,
                 shift.StartTime.ToString(DateFormat),
                 shift.EndTime.ToString(DateFormat),
-                durationInfo);
+                shift.Duration.ToString(DurationFormat));
         }
 
         AnsiConsole.Write(table);
@@ -562,7 +609,7 @@ public class ShiftLoggerUI : IShiftLoggerUI
                 .Spinner(Spinner.Known.Dots)
                 .StartAsync(label, ctx =>
                 {
-                    ctx.Status("Sending request...");
+                    ctx.Status("[yellow]Sending request...[/]");
                     return apiCall(cancellationToken);
                 });
         }
@@ -585,7 +632,7 @@ public class ShiftLoggerUI : IShiftLoggerUI
                 .Spinner(Spinner.Known.Dots)
                 .StartAsync(label, ctx =>
                 {
-                    ctx.Status("Sending request...");
+                    ctx.Status("[yellow]Sending request...[/]");
                     return apiCall(cancellationToken);
                 });
         }
