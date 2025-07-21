@@ -1,8 +1,11 @@
-﻿using Spectre.Console;
-using ShiftLogger.Presentation.Clients;
-using ShiftLogger.Presentation.UI.Helpers;
-using ShiftLogger.API.Results;
+﻿using Microsoft.OpenApi.Extensions;
 using ShiftLogger.API.DTOs;
+using ShiftLogger.API.Results;
+using ShiftLogger.Presentation.Clients;
+using ShiftLogger.Presentation.Menu;
+using ShiftLogger.Presentation.UI.Helpers;
+using ShiftLogger.Presentation.Validation;
+using Spectre.Console;
 
 namespace ShiftLogger.Presentation.UI;
 
@@ -16,9 +19,54 @@ public class ShiftLoggerUI : IShiftLoggerUI
         _apiClient = apiClient;
     }
 
-    public Task RunAsync(CancellationToken cancellationToken = default)
+    public async Task RunAsync(CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var userChoice = DisplayMenuAndGetChoice();
+
+            switch (userChoice)
+            {
+                case MenuOption.AddWorker:
+                    await CreateWorkerAsync(cancellationToken);
+                    break;
+                case MenuOption.UpdateWorker:
+                    await UpdateWorkerAsync(cancellationToken);
+                    break;
+                case MenuOption.DeleteWorker:
+                    await DeleteWorkerAsync(cancellationToken);
+                    break;
+                case MenuOption.ShowWorkerById:
+                    await ShowWorkerByIdAsync(cancellationToken);
+                    break;
+                case MenuOption.ShowWorkerByName:
+                    await ShowWorkerByNameAsync(cancellationToken);
+                    break;
+                case MenuOption.ShowWorkers:
+                    await ShowWorkersAsync(cancellationToken);
+                    break;
+                case MenuOption.CreateShift:
+                    await CreateShiftAsync(cancellationToken);
+                    break;
+                case MenuOption.UpdateShift:
+                    await UpdateShiftAsync(cancellationToken);
+                    break;
+                case MenuOption.DeleteShift:
+                    await DeleteShiftAsync(cancellationToken);
+                    break;
+                case MenuOption.ShowShiftById:
+                    await ShowShiftByIdAsync(cancellationToken);
+                    break;
+                case MenuOption.ShowShiftsByWorkerId:
+                    await ShowShiftsByWorkerIdAsync(cancellationToken);
+                    break;
+                case MenuOption.ShowShifts:
+                    await ShowShiftsAsync(cancellationToken);
+                    break;
+                case MenuOption.Exit:
+                    return;
+            }
+        }
     }
 
     private async Task CreateWorkerAsync(CancellationToken cancellationToken = default)
@@ -46,52 +94,45 @@ public class ShiftLoggerUI : IShiftLoggerUI
 
         var createdWorker = createdWorkerResult.Value!;
 
-        cancellationToken.ThrowIfCancellationRequested();
+        var creationResult = await ApiCallWithSpinnerAsync(
+            $"Creating worker [yellow]{name}[/]...", cancellationToken =>
+            _apiClient.CreateWorkerAsync(createdWorker, cancellationToken), cancellationToken);
 
-        try
+        if (!creationResult.IsSuccess)
         {
-            await AnsiConsole.Status()
-            .Spinner(Spinner.Known.Dots)
-            .StartAsync($"Creating worker [yellow]{name}[/]...", async ctx =>
-            {
-                ctx.Status("Sending request...");
-                var creationResult = await _apiClient.CreateWorkerAsync(createdWorker, cancellationToken);
-
-                if (!creationResult.IsSuccess)
-                {
-                    DisplayMessage(creationResult.ErrorMessage, "red");
-                    return;
-                }
-
-                DisplayMessage($"Successfully added worker with id = {creationResult.Value!.WorkerId}.", "green");
-            });
+            DisplayMessage(creationResult.ErrorMessage, "red");
+            return;
         }
-        catch (OperationCanceledException)
-        {
-            DisplayMessage("Operation cancelled by user", "yellow");
-        }
+
+        DisplayMessage($"Successfully added worker with id = {creationResult.Value!.WorkerId}.", "green");
     }
 
     private async Task UpdateWorkerAsync(CancellationToken cancellationToken = default)
     {
-        await ShowWorkersAsync();
+        await ShowWorkersAsync(cancellationToken);
 
-        var workerId = GetInput<int>("Please enter the id for the worker that you wish to update: ");
+        var workerId = GetInput<int>("Enter the id for the worker to update: ");
 
-        var name = GetOptionalInput("Do you wish to updated the worker's name? ")
-            ? GetInput<string>("Please enter updated worker name: ")
+        if (!ValidateInfo.IsValidNumericInput(workerId))
+        {
+            DisplayMessage("Worker id must be greater than 0", "red");
+            return;
+        }
+
+        var name = GetOptionalInput("Do you wish to update the worker's name? ")
+            ? GetInput<string>("Enter updated name: ").Trim()
             : null;
 
         var department = GetOptionalInput("Do you wish to update the worker's department? ")
-            ? GetInput<string>("Please enter the updated worker department: ")
+            ? GetInput<string>("Enter updated department: ").Trim()
             : null;
 
         var email = GetOptionalInput("Do you wish to update the worker's email address? ")
-            ? GetInput<string>("Please enter the updated worker email address: ")
+            ? GetInput<string>("Enter updated email address: ").Trim()
             : null;
 
-        var telephoneNumber = GetOptionalInput("Do you wish to update the worker's telephone number? ") 
-            ? GetInput<string>("Please enter the updated worker telephone number: ")
+        var telephoneNumber = GetOptionalInput("Do you wish to update the worker's telephone number? ")
+            ? GetInput<string>("Enter updated telephone number: ").Trim()
             : null;
 
         var updatedWorkerResult = ShiftLoggerUIHelper.BuildUpdateWorkerRequest(name, department, email, telephoneNumber);
@@ -104,171 +145,123 @@ public class ShiftLoggerUI : IShiftLoggerUI
 
         var updatedWorker = updatedWorkerResult.Value!;
 
-        cancellationToken.ThrowIfCancellationRequested();
+        var updateWorkerResult = await ApiCallWithSpinnerAsync($"Updating worker [yellow]{workerId}[/]...", cancellationToken => _apiClient.UpdateWorkerAsync(workerId, updatedWorker, cancellationToken), cancellationToken);
 
-        try
+        if (!updatedWorkerResult.IsSuccess)
         {
-            await AnsiConsole.Status()
-                .Spinner(Spinner.Known.Dots)
-                .StartAsync($"Updating worker with id [yellow]{workerId}[/]...", async ctx =>
-                {
-                    ctx.Status("Sending request...");
-                    var updateResult = await _apiClient.UpdateWorkerAsync(workerId, updatedWorker);
-
-                    if (!updateResult.IsSuccess)
-                    {
-                        DisplayMessage(updateResult.ErrorMessage, "red");
-                        return;
-                    }
-
-                    DisplayMessage($"Successfully updated worker with id = {workerId}.", "green");
-                });
+            DisplayMessage(updatedWorkerResult.ErrorMessage, "red");
+            return;
         }
-        catch (OperationCanceledException)
-        {
-            DisplayMessage("Operation cancelled by user", "yellow");
-        }
+
+        DisplayMessage($"Successfully updated worker {workerId}", "yellow");
     }
 
     private async Task DeleteWorkerAsync(CancellationToken cancellationToken = default)
     {
-        await ShowWorkersAsync();
+        await ShowWorkersAsync(cancellationToken);
 
-        var workerId = GetInput<int>("Please enter the id of the worker that you wish to delete: ");
+        var workerId = GetInput<int>("Enter the id of the worker to delete: ");
 
-        cancellationToken.ThrowIfCancellationRequested();
-
-        try
+        if (!ValidateInfo.IsValidNumericInput(workerId))
         {
-            await AnsiConsole.Status()
-                .Spinner(Spinner.Known.Dots)
-                .StartAsync($"Deleting worker with id [yellow]{workerId}[/]...", async ctx =>
-                {
-                    ctx.Status("Sending request...");
-
-                    var deletionResult = await _apiClient.DeleteWorkerAsync(workerId, cancellationToken);
-
-                    if (!deletionResult.IsSuccess)
-                    {
-                        DisplayMessage(deletionResult.ErrorMessage, "red");
-                        return;
-                    }
-
-                    DisplayMessage($"Successfully deleted worker with id = {workerId}.", "green");
-                });
+            DisplayMessage("Worker id must be greater than 0", "red");
+            return;
         }
-        catch (OperationCanceledException)
+
+        if (!GetOptionalInput($"Are you sure that you wish to delete worker [yellow]{workerId}[/]? "))
         {
-            DisplayMessage("Operation cancelled by user", "yellow");
+            DisplayMessage($"Deletion canceled", "yellow");
+            return;
         }
+
+        var deletionResult = await ApiCallWithSpinnerAsync(
+            $"Deleting worker [yellow]{workerId}[/]...", 
+            cancellationToken => _apiClient.DeleteWorkerAsync(workerId, cancellationToken), cancellationToken);
+
+        if (!deletionResult.IsSuccess)
+        {
+            DisplayMessage(deletionResult.ErrorMessage, "red");
+            return;
+        }
+
+        DisplayMessage($"Successfully deleted worker with id = {workerId}.", "green");
     }
 
     private async Task ShowWorkerByIdAsync(CancellationToken cancellationToken = default)
     {
-        await ShowWorkersAsync();
+        await ShowWorkersAsync(cancellationToken);
 
-        var workerId = GetInput<int>("Please enter the id of the worker you wish to see detailed information for: ");
+        var workerId = GetInput<int>("Enter the id of the worker to see detailed information for: ");
 
-        cancellationToken.ThrowIfCancellationRequested();
-
-        try
+        if (!ValidateInfo.IsValidNumericInput(workerId))
         {
-            await AnsiConsole.Status()
-                .Spinner(Spinner.Known.Dots)
-                .StartAsync($"Retrieving information for worker with id [yellow]{workerId}[/]", async ctx =>
-                {
-                    ctx.Status("Sending request...");
-                    var workerRetrievalResult = await _apiClient.GetWorkerByIdAsync(workerId, cancellationToken)!;
-
-                    if (!workerRetrievalResult.IsSuccess || workerRetrievalResult.Value is null)
-                    {
-                        DisplayMessage(workerRetrievalResult.ErrorMessage, "red");
-                        return;
-                    }
-
-                    DisplayWorker(workerRetrievalResult.Value);
-                });
-        }
-        catch (OperationCanceledException)
-        {
-            DisplayMessage("Operation cancelled by user", "yellow");
+            DisplayMessage("Worker id must be greater than 0", "red");
+            return;
         }
 
+        var workerRetrievalResult = await ApiCallWithSpinnerAsync(
+            $"Retrieving information for worker [yellow]{workerId}[/]",
+            cancellationToken => _apiClient.GetWorkerByIdAsync(workerId, cancellationToken), cancellationToken);
+
+        if (!workerRetrievalResult.IsSuccess || workerRetrievalResult.Value is null)
+        {
+            DisplayMessage(workerRetrievalResult.ErrorMessage, "red");
+            return;
+        }
+
+        DisplayWorker(workerRetrievalResult.Value);
     }
 
     private async Task ShowWorkerByNameAsync(CancellationToken cancellationToken = default)
     {
-        await ShowWorkersAsync();
+        await ShowWorkersAsync(cancellationToken);
 
-        var name = GetInput<string>("Please enter the name of the worker that you wish to see information for: ");
+        var name = GetInput<string>("Enter the name of the worker to see detailed information for: ");
 
-        cancellationToken.ThrowIfCancellationRequested();
-
-        try
+        if (!ValidateInfo.IsValidInputString(name))
         {
-            await AnsiConsole.Status()
-                .Spinner(Spinner.Known.Dots)
-                .StartAsync($"Retrieving workers...", async ctx =>
-                {
-                    ctx.Status("Sending request...");
-
-                    var retrievalResult = await _apiClient.GetWorkersAsync(name, cancellationToken);
-
-                    if (!retrievalResult.IsSuccess)
-                    {
-                        DisplayMessage(retrievalResult.ErrorMessage, "red");
-                        return;
-                    }
-
-                    DisplayWorkers(retrievalResult.Value!);
-                });
-        }
-        catch (OperationCanceledException)
-        {
-            DisplayMessage("Operation cancelled by user", "yellow");
+            DisplayMessage("Invalid worker name", "red");
+            return;
         }
 
+        var retrievalResult = await ApiCallWithSpinnerAsync(
+            $"Retrieving worker [yellow]{name}[/]...",
+            cancellationToken => _apiClient.GetWorkersAsync(name, cancellationToken), cancellationToken);
 
+        if (!retrievalResult.IsSuccess)
+        {
+            DisplayMessage(retrievalResult.ErrorMessage, "red");
+            return;
+        }
+
+        DisplayWorkers(retrievalResult.Value!);
     }
 
     private async Task ShowWorkersAsync(CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
+        var retrievalResult = await ApiCallWithSpinnerAsync(
+            $"Retrieving workers...", 
+            cancellationToken => _apiClient.GetWorkersAsync(null, cancellationToken), cancellationToken);
 
-        try
+
+        if (!retrievalResult.IsSuccess)
         {
-            await AnsiConsole.Status()
-            .Spinner(Spinner.Known.Dots)
-            .StartAsync($"Retrieving workers...", async ctx =>
-            {
-                ctx.Status("Sending request...");
-
-                var retrievalResult = await _apiClient.GetWorkersAsync(null, cancellationToken);
-
-                if (!retrievalResult.IsSuccess)
-                {
-                    DisplayMessage(retrievalResult.ErrorMessage, "red");
-                    return;
-                }
-
-                DisplayWorkers(retrievalResult.Value!);
-            });
+            DisplayMessage(retrievalResult.ErrorMessage, "red");
+            return;
         }
-        catch (OperationCanceledException)
-        {
-            DisplayMessage("Operation cancelled by user", "yellow");
-        }
+
+        DisplayWorkers(retrievalResult.Value!);
     }
 
     private async Task CreateShiftAsync(CancellationToken cancellationToken = default)
     {
-        await ShowWorkersAsync();
+        await ShowWorkersAsync(cancellationToken);
 
-        var workerId = GetInput<int>("Please enter the id of the worker that you want to log a shift for: ");
+        var workerId = GetInput<int>("Enter the id of the worker to log a shift for: ");
 
-        var startTimeDateString = GetInput<string>($"Please enter the start time in format: {DateFormat}: ");
+        var startTimeDateString = GetInput<string>($"Enter the start time in format: {DateFormat}: ");
 
-        var endTimeDateString = GetInput<string>($"Please enter the end time in format: {DateFormat}: ");
+        var endTimeDateString = GetInput<string>($"Enter the end time in format: {DateFormat}: ");
 
         var startTimeResult = ShiftLoggerUIHelper.BuildDateTime(startTimeDateString, DateFormat);
 
@@ -299,41 +292,34 @@ public class ShiftLoggerUI : IShiftLoggerUI
 
         var createdShift = createShiftResult.Value!;
 
-        cancellationToken.ThrowIfCancellationRequested();
+        var creationResult = await ApiCallWithSpinnerAsync(
+            $"Creating shift for worker [yellow]{workerId}[/]...", 
+            cancellationToken => _apiClient.CreateShiftAsync(createdShift, cancellationToken), cancellationToken);
 
-        try
+        if (!creationResult.IsSuccess)
         {
-            await AnsiConsole.Status()
-                .Spinner(Spinner.Known.Dots)
-                .StartAsync($"Creating shift for worker [yellow]{workerId}[/]...", async ctx =>
-                {
-                    ctx.Status("Sending request...");
-                    var creationResult = await _apiClient.CreateShiftAsync(createdShift, cancellationToken);
-
-                    if (!creationResult.IsSuccess)
-                    {
-                        DisplayMessage(creationResult.ErrorMessage, "red");
-                        return;
-                    }
-
-                    DisplayMessage($"Shift for worker with id = {workerId} added.", "green");
-                });
+            DisplayMessage(creationResult.ErrorMessage, "red");
+            return;
         }
-        catch (OperationCanceledException)
-        {
-            DisplayMessage("Operation cancelled by user", "yellow");
-        }
+
+        DisplayMessage($"Shift for worker with id = {workerId} added.", "green");
     }
 
     private async Task UpdateShiftAsync(CancellationToken cancellationToken = default)
     {
-        await ShowWorkersAsync();
+        await ShowWorkersAsync(cancellationToken);
 
-        var workerId = GetInput<int>("Please enter the id of the worker, who's shift you wish to update: ");
+        var workerId = GetInput<int>("Enter the id of the worker whose shift to update: ");
 
-        var startTimeDateString = GetInput<string>($"Please enter the start time in format: {DateFormat}: ");
+        if (!ValidateInfo.IsValidNumericInput(workerId))
+        {
+            DisplayMessage("Worker id must be greater than 0");
+            return;
+        }
 
-        var endTimeDateString = GetInput<string>($"Please enter the end time in format: {DateFormat}: ");
+        var startTimeDateString = GetInput<string>($"Enter the updated start time in format: {DateFormat}: ");
+
+        var endTimeDateString = GetInput<string>($"Enter the updated end time in format: {DateFormat}: ");
 
         var startTimeResult = ShiftLoggerUIHelper.BuildDateTime(startTimeDateString, DateFormat);
 
@@ -364,50 +350,113 @@ public class ShiftLoggerUI : IShiftLoggerUI
 
         var updateShift = updateShiftResult.Value!;
 
-        cancellationToken.ThrowIfCancellationRequested();
+        var updateResult = await ApiCallWithSpinnerAsync(
+            $"Updating shift for worker [yellow]{workerId}[/]...",
+            cancellationToken => _apiClient.UpdateShiftAsync(workerId, updateShift, cancellationToken), cancellationToken);
 
-        try
+        if (!updateResult.IsSuccess)
         {
-            await AnsiConsole.Status()
-                .Spinner(Spinner.Known.Dots)
-                .StartAsync($"Updating shift for worker [yellow]{workerId}[/]...", async ctx =>
-                {
-                    ctx.Status("Sending request...");
-                    var updateResult = await _apiClient.UpdateShiftAsync(workerId, updateShift, cancellationToken);
-
-                    if (!updateResult.IsSuccess)
-                    {
-                        DisplayMessage(updateResult.ErrorMessage, "red");
-                        return;
-                    }
-
-                    DisplayMessage($"Shift for worker with id = {workerId} updated.", "green");
-                });
+            DisplayMessage(updateResult.ErrorMessage, "red");
+            return;
         }
-        catch (OperationCanceledException)
-        {
-            DisplayMessage("Operation cancelled by user", "yellow");
-        }
+
+        DisplayMessage($"Shift for worker with id = {workerId} updated.", "green");
     }
 
     private async Task DeleteShiftAsync(CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        await ShowShiftsAsync(cancellationToken);
+
+        var shiftId = GetInput<int>("Enter the id of the shift to delete: ");
+
+        if (!ValidateInfo.IsValidNumericInput(shiftId))
+        {
+            DisplayMessage("Shift id must be greater than zero", "red");
+            return;
+        }
+
+        if (!GetOptionalInput($"Are you sure you want to delete shift [yellow]{shiftId}[/]? "))
+        {
+            DisplayMessage("Deletion canceled", "yellow");
+            return;
+        }
+
+        var deletionResult = await ApiCallWithSpinnerAsync(
+            $"Delete shift [yellow]{shiftId}[/]...", 
+            cancellationToken => _apiClient.DeleteShiftAsync(shiftId, cancellationToken), cancellationToken);
+
+        if (!deletionResult.IsSuccess)
+        {
+            DisplayMessage(deletionResult.ErrorMessage, "red");
+            return;
+        }
+
+        DisplayMessage($"Successfully delete shift with id = {shiftId}.");
     }
 
     private async Task ShowShiftByIdAsync(CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        await ShowShiftsAsync(cancellationToken);
+
+        var shiftId = GetInput<int>("Please enter the id of the shift that you wish to see detailed information for: ");
+
+        if (!ValidateInfo.IsValidNumericInput(shiftId))
+        {
+            DisplayMessage("Shift id must be greater than zero", "red");
+            return;
+        }
+
+        var retrievalResult = await ApiCallWithSpinnerAsync(
+            $"Retrieving shifts with id [yellow]{shiftId}[/]...",
+            cancellationToken => _apiClient.GetShiftByIdAsync(shiftId, cancellationToken), cancellationToken);
+
+        if (!retrievalResult.IsSuccess)
+        {
+            DisplayMessage(retrievalResult.ErrorMessage, "red");
+            return;
+        }
+
+        DisplayShift(retrievalResult.Value!);
     }
 
     private async Task ShowShiftsAsync(CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        var retrievalResult = await ApiCallWithSpinnerAsync(
+            $"Retrieving shifts...",
+            cancellationToken => _apiClient.GetShiftsAsync(null, cancellationToken), cancellationToken);
+
+        if (!retrievalResult.IsSuccess)
+        {
+            DisplayMessage(retrievalResult.ErrorMessage, "red");
+            return;
+        }
+
+        DisplayShifts(retrievalResult.Value!);
     }
 
     private async Task ShowShiftsByWorkerIdAsync(CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        await ShowWorkersAsync(cancellationToken);
+
+        var workerId = GetInput<int>("Please enter the id for the worker who you wish to see shifts for: ");
+
+        if (!ValidateInfo.IsValidNumericInput(workerId))
+        {
+            DisplayMessage("Worker id must be greater than 0");
+            return;
+        }
+
+        var retrievalResult = await ApiCallWithSpinnerAsync(
+            $"Retrieving shifts for worker [yellow]{workerId}[/]...",
+            cancellationToken => _apiClient.GetShiftsAsync(workerId, cancellationToken), cancellationToken);
+
+        if (!retrievalResult.IsSuccess)
+        {
+            DisplayMessage(retrievalResult.ErrorMessage, "red");
+            return;
+        }
+
+        DisplayShifts(retrievalResult.Value!);
     }
 
     private T GetInput<T>(string message, string color = "teal")
@@ -449,7 +498,7 @@ public class ShiftLoggerUI : IShiftLoggerUI
 
     public void DisplayWorkers(IReadOnlyList<WorkerResponse> workers)
     {
-        var table = new Table();
+        var table = new Table().Expand();
         table.AddColumn("Id");
         table.AddColumn("Name");
         table.AddColumn("Department");
@@ -473,7 +522,7 @@ public class ShiftLoggerUI : IShiftLoggerUI
 
     public void DisplayShifts(IReadOnlyList<ShiftResponse> shifts)
     {
-        var table = new Table();
+        var table = new Table().Expand();
         table.AddColumn("Id");
         table.AddColumn("Worker Id");
         table.AddColumn("Worker Name");
@@ -482,7 +531,7 @@ public class ShiftLoggerUI : IShiftLoggerUI
         table.AddColumn("Shift End Time");
         table.AddColumn("Shift Duration");
 
-        DisplayMessage("Shifts", "underline blue");
+        DisplayMessage("Shifts\n", "underline blue");
 
         foreach (var shift in shifts)
         {
@@ -499,6 +548,61 @@ public class ShiftLoggerUI : IShiftLoggerUI
         }
 
         AnsiConsole.Write(table);
+    }
+
+    private async Task<Result> ApiCallWithSpinnerAsync(
+        string label,
+        Func<CancellationToken, Task<Result>> apiCall, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        try
+        {
+            return await AnsiConsole.Status()
+                .Spinner(Spinner.Known.Dots)
+                .StartAsync(label, ctx =>
+                {
+                    ctx.Status("Sending request...");
+                    return apiCall(cancellationToken);
+                });
+        }
+        catch (OperationCanceledException)
+        {
+            DisplayMessage("Operation cancelled by user", "yellow");
+            return Result.Fail("Cancelled");
+        }
+    }
+
+    private async Task<Result<T>> ApiCallWithSpinnerAsync<T>(
+        string label,
+        Func<CancellationToken, Task<Result<T>>> apiCall, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        try
+        {
+            return await AnsiConsole.Status()
+                .Spinner(Spinner.Known.Dots)
+                .StartAsync(label, ctx =>
+                {
+                    ctx.Status("Sending request...");
+                    return apiCall(cancellationToken);
+                });
+        }
+        catch (OperationCanceledException)
+        {
+            DisplayMessage("Operation cancelled by user", "yellow");
+            return Result<T>.Fail("Cancelled");
+        }
+    }
+
+    private MenuOption DisplayMenuAndGetChoice()
+    {
+        return AnsiConsole.Prompt(
+            new SelectionPrompt<MenuOption>()
+            .Title("Please choose one of the following options:")
+            .AddChoices(Enum.GetValues<MenuOption>())
+            .UseConverter(choice => choice.GetDisplayName()));
     }
 }
 
