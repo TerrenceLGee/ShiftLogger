@@ -28,11 +28,11 @@ public class ApiClient : IApiClient
         HttpMethod.Put, $"{ShiftsPath}/{id}", request, cancellationToken);
 
 
-    public Task<Result> DeleteShiftAsync(int id, CancellationToken cancellationToken = default) => SendAsync(HttpMethod.Delete, $"{ShiftsPath}/{id}", cancellationToken);
+    public Task<Result> DeleteShiftAsync(int id, CancellationToken cancellationToken = default) => SendAsync(HttpMethod.Delete, $"{ShiftsPath}/{id}", payload: null, cancellationToken);
 
 
     public Task<Result<ShiftResponse>> GetShiftByIdAsync(int id, CancellationToken cancellationToken = default) => SendAsync<ShiftResponse>(
-        HttpMethod.Get, $"{ShiftsPath}/{id}", cancellationToken);
+        HttpMethod.Get, $"{ShiftsPath}/{id}", payload: null, cancellationToken);
 
 
     public Task<Result<IReadOnlyList<ShiftResponse>>> GetShiftsAsync(int? workerId, CancellationToken cancellationToken = default)
@@ -42,7 +42,7 @@ public class ApiClient : IApiClient
             : $"{ShiftsPath}/worker/{workerId}";
 
         return SendAsync<IReadOnlyList<ShiftResponse>>(
-            HttpMethod.Get, url, cancellationToken);
+            HttpMethod.Get, url, payload: null, cancellationToken);
     }
 
 
@@ -55,11 +55,11 @@ public class ApiClient : IApiClient
         HttpMethod.Put, $"{WorkersPath}/{id}", request, cancellationToken);
 
 
-    public Task<Result> DeleteWorkerAsync(int id, CancellationToken cancellationToken = default) => SendAsync(HttpMethod.Delete, $"{WorkersPath}/{id}", cancellationToken);
+    public Task<Result> DeleteWorkerAsync(int id, CancellationToken cancellationToken = default) => SendAsync(HttpMethod.Delete, $"{WorkersPath}/{id}", payload: null,  cancellationToken);
 
 
     public Task<Result<WorkerResponse>> GetWorkerByIdAsync(int id, CancellationToken cancellationToken = default) => SendAsync<WorkerResponse>(
-        HttpMethod.Get, $"{WorkersPath}/{id}", cancellationToken);
+        HttpMethod.Get, $"{WorkersPath}/{id}", payload: null, cancellationToken);
 
 
     public Task<Result<IReadOnlyList<WorkerResponse>>> GetWorkersAsync(string? nameFilter = null, CancellationToken cancellationToken = default)
@@ -69,7 +69,7 @@ public class ApiClient : IApiClient
             : QueryHelpers.AddQueryString(WorkersPath, "name", nameFilter!);
 
         return SendAsync<IReadOnlyList<WorkerResponse>>(
-            HttpMethod.Get, url, cancellationToken);
+            HttpMethod.Get, url, payload: null, cancellationToken);
     }
 
 

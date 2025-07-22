@@ -1,73 +1,117 @@
-﻿using ShiftLogger.API.DTOs;
-using ShiftLogger.API.Results;
-using ShiftLogger.Presentation.Validation;
-using System.Globalization;
+﻿using ShiftLogger.API.Results;
+using Spectre.Console;
 
 namespace ShiftLogger.Presentation.UI.Helpers;
 
 public static class ShiftLoggerUIHelper
 {
-    public static Result<DateTime> BuildDateTime(string dateString, string dateFormat)
+    public static async Task<Result<T>> ApiCallWithSpinnerAsync<T>(
+        string label,
+        Func<CancellationToken, Task<Result<T>>> apiCall, CancellationToken cancellationToken)
     {
-        CultureInfo info = CultureInfo.InvariantCulture;
+        cancellationToken.ThrowIfCancellationRequested();
 
-        if (!ValidateInfo.IsValidDateString(dateString, dateFormat, info))
-            return Result<DateTime>.Fail($"Invalid date, date must match format: {dateFormat}");
-
-        var validTime =  DateTime.ParseExact(dateString, dateFormat, info);
-
-        return Result<DateTime>.Ok(validTime);
+        try
+        {
+            return await AnsiConsole.Status()
+                .Spinner(Spinner.Known.Dots)
+                .StartAsync(label, ctx =>
+                {
+                    ctx.Status("[yellow]Sending request...[/]");
+                    return apiCall(cancellationToken);
+                });
+        }
+        catch (OperationCanceledException)
+        {
+            DisplayMessage("Operation cancelled by user", "yellow");
+            return Result<T>.Fail("Cancelled");
+        }
     }
 
-    public static Result<CreateWorkerRequest> BuildWorkerRequest(string name, string department, string? email, string? telephoneNumber)
+    public static async Task<Result> ApiCallWithSpinnerAsync(
+        string label,
+        Func<CancellationToken, Task<Result>> apiCall, CancellationToken cancellationToken)
     {
-        if (!ValidateInfo.IsValidInputString(name))
-            return Result<CreateWorkerRequest>.Fail("Worker name must be provided");
+        cancellationToken.ThrowIfCancellationRequested();
 
-        if (!ValidateInfo.IsValidInputString(department))
-            return Result<CreateWorkerRequest>.Fail("Worker department must be provided");
-        
-        var request =  new CreateWorkerRequest { Name = name, Department = department, Email = email, TelephoneNumber = telephoneNumber };
-
-        return Result<CreateWorkerRequest>.Ok(request);
+        try
+        {
+            return await AnsiConsole.Status()
+                .Spinner(Spinner.Known.Dots)
+                .StartAsync(label, ctx =>
+                {
+                    ctx.Status("[yellow]Sending request...[/]");
+                    return apiCall(cancellationToken);
+                });
+        }
+        catch (OperationCanceledException)
+        {
+            DisplayMessage("Operation cancelled by user", "yellow");
+            return Result.Fail("Cancelled");
+        }
     }
 
-    public static Result<UpdateWorkerRequest> BuildUpdateWorkerRequest(string? name, string? department, string? email, string? telephoneNumber)
+    public static void ShowPaginatedItems<T>(IReadOnlyList<T> items, string entityName, Action<IReadOnlyList<T>> display, int pageSize = 10)
     {
-        if (new[] {name, department, email, telephoneNumber}
-        .All(string.IsNullOrWhiteSpace))
-            return Result<UpdateWorkerRequest>.Fail($"In order to update there must be at least one field provided");
+        if (ShiftLoggerHelper.IsListEmpty(items, entityName))
+            return;
 
-        var request =  new UpdateWorkerRequest { Name = name, Department = department, Email = email, TelephoneNumber = telephoneNumber };
+        int pageIndex = 0;
+        int pageCount = (int)Math.Ceiling(items.Count / (double)pageSize);
 
-        return Result<UpdateWorkerRequest>.Ok(request);
+        while (true)
+        {
+            var pageItems = items
+                .Skip(pageIndex * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            DisplayMessage(
+                $"Page {pageIndex + 1} of {pageCount} (showing {pageItems.Count} of {items.Count})", "blue");
+
+            display(pageItems);
+
+            var prompt = new SelectionPrompt<string>()
+                .Title("Navigate pages:");
+
+            if (pageIndex > 0)
+                prompt.AddChoice("Previous");
+
+            prompt.AddChoice("Exit");
+
+            if (pageIndex < pageCount - 1)
+                prompt.AddChoice("Next");
+
+            var choice = AnsiConsole.Prompt(prompt);
+
+            if (choice == "Next" && pageIndex < pageCount - 1)
+                pageIndex++;
+            else if (choice == "Previous" && pageIndex > 0)
+                pageIndex--;
+            else break;
+        }
     }
 
-    public static Result<CreateShiftRequest> BuildCreateShiftRequest(int workerId, DateTime startTime, DateTime endTime)
+    public static T GetInput<T>(string message, string color = "teal")
     {
-        if (!ValidateInfo.IsValidNumericInput(workerId))
-            return Result<CreateShiftRequest>.Fail($"Worker id must be greater than 0");
-
-        if (!ValidateInfo.IsValidEndTime(startTime, endTime))
-            return Result<CreateShiftRequest>.Fail($"End time must come after start time");
-
-
-        var request =  new CreateShiftRequest { WorkerId = workerId, StartTime = startTime, EndTime = endTime };
-
-        return Result<CreateShiftRequest>.Ok(request);
+        return AnsiConsole.Ask<T>(message);
     }
 
-    public static Result<UpdateShiftRequest> BuildUpdateShiftRequest(int workerId, DateTime startTime, DateTime endTime)
+    public static void DisplayMessage(string? message, string color = "teal")
     {
-        if (!ValidateInfo.IsValidNumericInput(workerId))
-            return Result<UpdateShiftRequest>.Fail("Worker id must be greater than 0");
+        AnsiConsole.MarkupLine($"[{color}]{message}[/]");
+    }
 
-        if (!ValidateInfo.IsValidEndTime(startTime, endTime))
-            return Result<UpdateShiftRequest>.Fail("End time must come after start time");
+    public static bool GetOptionalInput(string optional, string color = "teal")
+    {
+        return AnsiConsole.Confirm($"[{color}]{optional}[/]");
+    }
 
-        var request =  new UpdateShiftRequest { WorkerId = workerId, StartTime = startTime, EndTime = endTime };
-
-        return Result<UpdateShiftRequest>.Ok(request);
+    public static string PromptUpdateDate(string label, string dateFormat, DateTime current)
+    {
+        return GetOptionalInput($"Do you wish to update the {label} time? ")
+            ? GetInput<string>($"Enter updated {label} time (24-hour clock 0-23) in format: ({dateFormat})").Trim()
+            : current.ToString(dateFormat);
     }
 }
 
