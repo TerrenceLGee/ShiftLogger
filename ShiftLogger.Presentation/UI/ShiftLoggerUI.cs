@@ -1,4 +1,5 @@
-﻿using Microsoft.OpenApi.Extensions;
+﻿using Microsoft.Identity.Client;
+using Microsoft.OpenApi.Extensions;
 using ShiftLogger.API.DTOs;
 using ShiftLogger.API.Results;
 using ShiftLogger.Presentation.Clients;
@@ -87,11 +88,8 @@ public class ShiftLoggerUI : IShiftLoggerUI
         var createdWorkerResult = ShiftLoggerUIHelper.BuildWorkerRequest(name, department, email, telephoneNumber);
 
 
-        if (!createdWorkerResult.IsSuccess)
-        {
-            DisplayMessage(createdWorkerResult.ErrorMessage, "red");
+        if (HandleFailure(createdWorkerResult))
             return;
-        }
 
         var createdWorker = createdWorkerResult.Value!;
 
@@ -99,20 +97,21 @@ public class ShiftLoggerUI : IShiftLoggerUI
             $"[yellow]Creating worker {name}[/]...", cancellationToken =>
             _apiClient.CreateWorkerAsync(createdWorker, cancellationToken), cancellationToken);
 
-        if (!creationResult.IsSuccess)
-        {
-            DisplayMessage(creationResult.ErrorMessage, "red");
+        if (HandleFailure(creationResult, out var created))
             return;
-        }
-
-        var created = creationResult.Value!;
 
         DisplayMessage($"Successfully added worker with id = {created.WorkerId}.", "green");
     }
 
     private async Task UpdateWorkerAsync(CancellationToken cancellationToken = default)
     {
-        await ShowWorkersAsync(cancellationToken);
+        var workersResult = await _apiClient.GetWorkersAsync(null, cancellationToken);
+
+        if (HandleFailure(workersResult, out var workers))
+            return;
+
+        ShowPaginatedItems(workers, "workers", DisplayWorkers);
+
 
         var workerId = GetInput<int>("Enter the id for the worker to update: ");
 
@@ -140,28 +139,25 @@ public class ShiftLoggerUI : IShiftLoggerUI
 
         var updatedWorkerResult = ShiftLoggerUIHelper.BuildUpdateWorkerRequest(name, department, email, telephoneNumber);
 
-        if (!updatedWorkerResult.IsSuccess)
-        {
-            DisplayMessage(updatedWorkerResult.ErrorMessage, "red");
+        if (HandleFailure(updatedWorkerResult, out var updatedWorker))
             return;
-        }
-
-        var updatedWorker = updatedWorkerResult.Value!;
 
         var updateWorkerResult = await ApiCallWithSpinnerAsync($"[yellow]Updating worker {workerId}[/]...", cancellationToken => _apiClient.UpdateWorkerAsync(workerId, updatedWorker, cancellationToken), cancellationToken);
 
-        if (!updatedWorkerResult.IsSuccess)
-        {
-            DisplayMessage(updatedWorkerResult.ErrorMessage, "red");
+        if (HandleFailure(updateWorkerResult))
             return;
-        }
 
         DisplayMessage($"Successfully updated worker {workerId}", "yellow");
     }
 
     private async Task DeleteWorkerAsync(CancellationToken cancellationToken = default)
     {
-        await ShowWorkersAsync(cancellationToken);
+        var workersResult = await _apiClient.GetWorkersAsync();
+
+        if (HandleFailure(workersResult, out var workers))
+            return;
+
+        ShowPaginatedItems(workers, "workers", DisplayWorkers);
 
         var workerId = GetInput<int>("Enter the id of the worker to delete: ");
 
@@ -181,18 +177,20 @@ public class ShiftLoggerUI : IShiftLoggerUI
             $"[yellow]Deleting worker {workerId}[/]...", 
             cancellationToken => _apiClient.DeleteWorkerAsync(workerId, cancellationToken), cancellationToken);
 
-        if (!deletionResult.IsSuccess)
-        {
-            DisplayMessage(deletionResult.ErrorMessage, "red");
+        if (HandleFailure(deletionResult))
             return;
-        }
 
         DisplayMessage($"Successfully deleted worker with id = {workerId}.", "green");
     }
 
     private async Task ShowWorkerByIdAsync(CancellationToken cancellationToken = default)
     {
-        await ShowWorkersAsync(cancellationToken);
+        var workersResult = await _apiClient.GetWorkersAsync();
+
+        if (HandleFailure(workersResult, out var workers))
+            return;
+
+        ShowPaginatedItems(workers, "workers", DisplayWorkers);
 
         var workerId = GetInput<int>("Enter the id of the worker to see detailed information for: ");
 
@@ -206,20 +204,20 @@ public class ShiftLoggerUI : IShiftLoggerUI
             $"[yellow]Retrieving information for worker {workerId}[/]",
             cancellationToken => _apiClient.GetWorkerByIdAsync(workerId, cancellationToken), cancellationToken);
 
-        if (!workerRetrievalResult.IsSuccess || workerRetrievalResult.Value is null)
-        {
-            DisplayMessage(workerRetrievalResult.ErrorMessage, "red");
+        if (HandleFailure(workerRetrievalResult, out var retrieved))
             return;
-        }
-
-        var retrieved = workerRetrievalResult.Value;
 
         DisplayWorker(retrieved);
     }
 
     private async Task ShowWorkerByNameAsync(CancellationToken cancellationToken = default)
     {
-        await ShowWorkersAsync(cancellationToken);
+        var workersResult = await _apiClient.GetWorkersAsync();
+
+        if (HandleFailure(workersResult, out var workers))
+            return;
+
+        ShowPaginatedItems(workers, "workers", DisplayWorkers);
 
         var name = GetInput<string>("Enter the name of the worker to see detailed information for: ").Trim();
 
@@ -233,18 +231,10 @@ public class ShiftLoggerUI : IShiftLoggerUI
             $"[yellow]Retrieving worker {name}[/]...",
             cancellationToken => _apiClient.GetWorkersAsync(name, cancellationToken), cancellationToken);
 
-        if (!retrievalResult.IsSuccess)
-        {
-            DisplayMessage(retrievalResult.ErrorMessage, "red");
+        if (HandleFailure(retrievalResult, out var retrieved))
             return;
-        }
 
-        var retrieved = retrievalResult.Value!;
-
-        if (HandleNoData(retrieved, $"worker matching the name {name}")) 
-            return;
-        
-        DisplayWorkers(retrieved);
+        ShowPaginatedItems(retrieved, $"worker matching the name {name}", DisplayWorkers);
     }
 
     private async Task ShowWorkersAsync(CancellationToken cancellationToken = default)
@@ -253,24 +243,23 @@ public class ShiftLoggerUI : IShiftLoggerUI
             $"[yellow]Retrieving workers...[/]", 
             cancellationToken => _apiClient.GetWorkersAsync(null, cancellationToken), cancellationToken);
 
-
-        if (!retrievalResult.IsSuccess)
-        {
-            DisplayMessage(retrievalResult.ErrorMessage, "red");
+        if (HandleFailure(retrievalResult, out var retrieved))
             return;
-        }
-
-        var retrieved = retrievalResult.Value!;
 
         if (HandleNoData(retrieved, "workers"))
             return;
 
-        DisplayWorkers(retrieved);
+        ShowPaginatedItems(retrieved, "workers", DisplayWorkers);
     }
 
     private async Task CreateShiftAsync(CancellationToken cancellationToken = default)
     {
-        await ShowWorkersAsync(cancellationToken);
+        var workerResult = await _apiClient.GetWorkersAsync();
+
+        if (HandleFailure(workerResult, out var workers))
+            return;
+
+        ShowPaginatedItems(workers, "workers", DisplayWorkers);
 
         var workerId = GetInput<int>("Enter the id of the worker to log a shift for: ");
 
@@ -286,51 +275,40 @@ public class ShiftLoggerUI : IShiftLoggerUI
 
         var startTimeResult = ShiftLoggerUIHelper.BuildDateTime(startTimeDateString, DateFormat);
 
-        if (!startTimeResult.IsSuccess)
-        {
-            DisplayMessage(startTimeResult.ErrorMessage, "red");
+        if (HandleFailure(startTimeResult))
             return;
-        }
 
         var endTimeResult = ShiftLoggerUIHelper.BuildDateTime(endTimeDateString, DateFormat);
 
-        if (!endTimeResult.IsSuccess)
-        {
-            DisplayMessage(endTimeResult.ErrorMessage, "red");
+        if (HandleFailure(endTimeResult))
             return;
-        }
 
         var startTime = startTimeResult.Value!;
         var endTime = endTimeResult.Value!;
 
         var createShiftResult = ShiftLoggerUIHelper.BuildCreateShiftRequest(workerId, startTime, endTime);
 
-        if (!createShiftResult.IsSuccess)
-        {
-            DisplayMessage(createShiftResult.ErrorMessage, "red");
+        if (HandleFailure(createShiftResult, out var createdShift))
             return;
-        }
-
-        var createdShift = createShiftResult.Value!;
 
         var creationResult = await ApiCallWithSpinnerAsync(
             $"[yellow]Creating shift for worker {workerId}[/]...", 
             cancellationToken => _apiClient.CreateShiftAsync(createdShift, cancellationToken), cancellationToken);
 
-        if (!creationResult.IsSuccess)
-        {
-            DisplayMessage(creationResult.ErrorMessage, "red");
+        if (HandleFailure(creationResult, out var created))
             return;
-        }
-
-        var created = creationResult.Value!;
 
         DisplayMessage($"Shift for worker with id = {created.WorkerId} added.", "green");
     }
 
     private async Task UpdateShiftAsync(CancellationToken cancellationToken = default)
     {
-        await ShowWorkersAsync(cancellationToken);
+        var workerResult = await _apiClient.GetWorkersAsync();
+
+        if (HandleFailure(workerResult, out var workers))
+            return;
+
+        ShowPaginatedItems(workers, "workers", DisplayWorkers);
 
         var workerId = GetInput<int>("Enter the id of the worker whose shift to update: ");
 
@@ -346,44 +324,30 @@ public class ShiftLoggerUI : IShiftLoggerUI
 
         var startTimeResult = ShiftLoggerUIHelper.BuildDateTime(startTimeDateString, DateFormat);
 
-        if (!startTimeResult.IsSuccess)
-        {
-            DisplayMessage(startTimeResult.ErrorMessage, "red");
+        if (HandleFailure(startTimeResult))
             return;
-        }
 
         var endTimeResult = ShiftLoggerUIHelper.BuildDateTime(endTimeDateString, DateFormat);
 
-        if (!endTimeResult.IsSuccess)
-        {
-            DisplayMessage(endTimeResult.ErrorMessage, "red");
+        if (HandleFailure(endTimeResult))
             return;
-        }
 
         var startTime = startTimeResult.Value!;
         var endTime = endTimeResult.Value!;
 
         var updateShiftResult = ShiftLoggerUIHelper.BuildUpdateShiftRequest(workerId, startTime, endTime);
 
-        if (!updateShiftResult.IsSuccess)
-        {
-            DisplayMessage(updateShiftResult.ErrorMessage, "red");
+        if (HandleFailure(updateShiftResult, out var updateShift))
             return;
-        }
-
-        var updateShift = updateShiftResult.Value!;
 
         var updateResult = await ApiCallWithSpinnerAsync(
             $"[yellow]Updating shift for worker {workerId}[/]...",
             cancellationToken => _apiClient.UpdateShiftAsync(workerId, updateShift, cancellationToken), cancellationToken);
 
-        if (!updateResult.IsSuccess)
-        {
-            DisplayMessage(updateResult.ErrorMessage, "red");
+        if (HandleFailure(updateResult, out var updatedShift))
             return;
-        }
 
-        DisplayMessage($"Shift for worker with id = {workerId} updated.", "green");
+        DisplayMessage($"Shift for worker with id = {updatedShift.WorkerId} updated.", "green");
     }
 
     private async Task DeleteShiftAsync(CancellationToken cancellationToken = default)
@@ -464,10 +428,7 @@ public class ShiftLoggerUI : IShiftLoggerUI
 
         var retrieved = retrievalResult.Value!;
 
-        if (HandleNoData(retrieved, "shifts"))
-            return;
-
-        DisplayShifts(retrieved);
+        ShowPaginatedItems(retrieved, "shifts", DisplayShifts);
     }
 
     private async Task ShowShiftsByWorkerIdAsync(CancellationToken cancellationToken = default)
@@ -494,10 +455,7 @@ public class ShiftLoggerUI : IShiftLoggerUI
 
         var retrieved = retrievalResult.Value!;
 
-        if (HandleNoData(retrieved, $"shifts for worker {workerId}"))
-            return;
-
-        DisplayShifts(retrieved);
+        ShowPaginatedItems(retrieved, $"shifts for worker {workerId}", DisplayShifts);
     }
 
     private T GetInput<T>(string message, string color = "teal")
@@ -545,7 +503,7 @@ public class ShiftLoggerUI : IShiftLoggerUI
         DisplayMessage($"Shift duration: {shift.Duration.ToString(DurationFormat)}", "blue");
     }
 
-    public void DisplayWorkers(IReadOnlyList<WorkerResponse> workers)
+    private void DisplayWorkers(IReadOnlyList<WorkerResponse> workers)
     {
         var table = new Table().Expand();
         table.AddColumn("Id");
@@ -569,7 +527,7 @@ public class ShiftLoggerUI : IShiftLoggerUI
         AnsiConsole.Write(table);
     }
 
-    public void DisplayShifts(IReadOnlyList<ShiftResponse> shifts)
+    private void DisplayShifts(IReadOnlyList<ShiftResponse> shifts)
     {
         var table = new Table().Expand();
         table.AddColumn("Id");
@@ -650,6 +608,70 @@ public class ShiftLoggerUI : IShiftLoggerUI
             .Title("Please choose one of the following options:")
             .AddChoices(Enum.GetValues<MenuOption>())
             .UseConverter(choice => choice.GetDisplayName()));
+    }
+
+    private void ShowPaginatedItems<T>(IReadOnlyList<T> items, string entityName, Action<IReadOnlyList<T>> display, int pageSize = 10)
+    {
+        if (HandleNoData(items, entityName))
+            return;
+
+        int pageIndex = 0;
+        int pageCount = (int)Math.Ceiling(items.Count / (double)pageSize);
+
+        while (true)
+        {
+            var pageItems = items
+                .Skip(pageIndex * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            DisplayMessage(
+                $"Page {pageIndex + 1} of {pageCount} (showing {pageItems.Count} of {items.Count})", "blue");
+
+            display(pageItems);
+
+            var prompt = new SelectionPrompt<string>()
+                .Title("Navigate pages:");
+
+            if (pageIndex > 0)
+                prompt.AddChoice("Previous");
+
+            prompt.AddChoice("Exit");
+
+            if (pageIndex < pageCount - 1)
+                prompt.AddChoice("Next");
+
+            var choice = AnsiConsole.Prompt(prompt);
+
+            if (choice == "Next" && pageIndex < pageCount - 1)
+                pageIndex++;
+            else if (choice == "Previous" && pageIndex > 0)
+                pageIndex--;
+            else break;
+        }
+    }
+
+    private bool HandleFailure<T>(Result<T> result, out T value)
+    {
+        if (!result.IsSuccess)
+        {
+            DisplayMessage(result.ErrorMessage, "red");
+            value = default!;
+            return true;
+        }
+
+        value = result.Value!;
+        return false;
+    }
+    
+    private bool HandleFailure(Result result)
+    {
+        if (!result.IsSuccess)
+        {
+            DisplayMessage(result.ErrorMessage);
+            return true;
+        }
+        return false;
     }
 }
 
