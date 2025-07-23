@@ -1,6 +1,5 @@
 ﻿using Microsoft.OpenApi.Extensions;
 using ShiftLogger.API.DTOs;
-using ShiftLogger.API.Results;
 using ShiftLogger.Presentation.Clients;
 using ShiftLogger.Presentation.Menu;
 using ShiftLogger.Presentation.UI.Helpers;
@@ -71,7 +70,7 @@ public class ShiftLoggerUI : IShiftLoggerUI
                 continue;
             }
 
-            
+
 
             if (userChoice == MenuOption.Exit)
             {
@@ -359,7 +358,7 @@ public class ShiftLoggerUI : IShiftLoggerUI
         if (ShiftLoggerHelper.IsFailure(shiftResult, out var shift))
             return;
 
-        var startTimeDateString = ShiftLoggerUIHelper.PromptUpdateDate("start", DateFormat,  shift.StartTime);
+        var startTimeDateString = ShiftLoggerUIHelper.PromptUpdateDate("start", DateFormat, shift.StartTime);
 
         var endTimeDateString = ShiftLoggerUIHelper.PromptUpdateDate("end", DateFormat, shift.EndTime);
 
@@ -494,7 +493,7 @@ public class ShiftLoggerUI : IShiftLoggerUI
         ShiftLoggerUIHelper.ShowPaginatedItems(retrieved, $"shifts for worker {workerId}", DisplayShifts);
     }
 
-    
+
 
     private void DisplayWorker(WorkerResponse worker)
     {
@@ -568,7 +567,7 @@ public class ShiftLoggerUI : IShiftLoggerUI
         AnsiConsole.Write(table);
     }
 
-    
+
     private MenuOption DisplayMenuAndGetChoice()
     {
         return AnsiConsole.Prompt(

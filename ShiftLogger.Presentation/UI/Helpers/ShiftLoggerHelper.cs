@@ -34,10 +34,6 @@ public static class ShiftLoggerHelper
 
     public static Result<UpdateWorkerRequest> BuildUpdateWorkerRequest(string? name, string? department, string? email, string? telephoneNumber)
     {
-        if (new[] {name, department, email, telephoneNumber}
-        .All(string.IsNullOrWhiteSpace))
-            return Result<UpdateWorkerRequest>.Fail($"In order to update there must be at least one field provided");
-
         var request =  new UpdateWorkerRequest { Name = name, Department = department, Email = email, TelephoneNumber = telephoneNumber };
 
         return Result<UpdateWorkerRequest>.Ok(request);
