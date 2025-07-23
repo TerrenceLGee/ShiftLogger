@@ -33,4 +33,12 @@ var host = Host.CreateDefaultBuilder(args)
     .Build();
 
 var userInterface = host.Services.GetRequiredService<IShiftLoggerUI>();
-await userInterface.RunAsync(cts.Token);
+try
+{
+    await userInterface.RunAsync(cts.Token);
+}
+catch (OperationCanceledException)
+{
+    Console.WriteLine("Application closing due to use cancellation");
+}
+

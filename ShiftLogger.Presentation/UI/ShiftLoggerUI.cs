@@ -61,7 +61,17 @@ public class ShiftLoggerUI : IShiftLoggerUI
                 continue;
             }
 
-            await handler(cancellationToken);
+            try
+            {
+                await handler(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                ShiftLoggerUIHelper.DisplayMessage("Operation cancelled. Exiting.", "yellow");
+                continue;
+            }
+
+            
 
             if (userChoice == MenuOption.Exit)
             {
@@ -124,21 +134,26 @@ public class ShiftLoggerUI : IShiftLoggerUI
         if (!ShiftLoggerHelper.IsValidWorkerId(workers, workerId))
             return;
 
+        var workerResult = await _apiClient.GetWorkerByIdAsync(workerId, cancellationToken);
+
+        if (ShiftLoggerHelper.IsFailure(workerResult, out var worker))
+            return;
+
         var name = ShiftLoggerUIHelper.GetOptionalInput("Do you wish to update the worker's name? ")
             ? ShiftLoggerUIHelper.GetInput<string>("Enter updated name: ").Trim()
-            : null;
+            : worker.Name;
 
         var department = ShiftLoggerUIHelper.GetOptionalInput("Do you wish to update the worker's department? ")
             ? ShiftLoggerUIHelper.GetInput<string>("Enter updated department: ").Trim()
-            : null;
+            : worker.Department;
 
         var email = ShiftLoggerUIHelper.GetOptionalInput("Do you wish to update the worker's email address? ")
             ? ShiftLoggerUIHelper.GetInput<string>("Enter updated email address: ").Trim()
-            : null;
+            : worker.Email;
 
         var telephoneNumber = ShiftLoggerUIHelper.GetOptionalInput("Do you wish to update the worker's telephone number? ")
             ? ShiftLoggerUIHelper.GetInput<string>("Enter updated telephone number: ").Trim()
-            : null;
+            : worker.TelephoneNumber;
 
         var updatedWorkerResult = ShiftLoggerHelper.BuildUpdateWorkerRequest(name, department, email, telephoneNumber);
 
