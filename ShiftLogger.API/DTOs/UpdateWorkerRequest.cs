@@ -1,6 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
-
-namespace ShiftLogger.API.DTOs;
+﻿namespace ShiftLogger.API.DTOs;
 
 public class UpdateWorkerRequest
 {

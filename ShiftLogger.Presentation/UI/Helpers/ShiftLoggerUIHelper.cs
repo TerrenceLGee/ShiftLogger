@@ -77,7 +77,7 @@ public static class ShiftLoggerUIHelper
             if (pageIndex > 0)
                 prompt.AddChoice("Previous");
 
-            prompt.AddChoice("Exit");
+            prompt.AddChoice("Continue");
 
             if (pageIndex < pageCount - 1)
                 prompt.AddChoice("Next");

@@ -23,7 +23,7 @@ public class WorkerService : IWorkerService
         try
         {
             if (workerRequest is null)
-                return _logger.LogErrorAndReturnFail<DTOs.WorkerResponse>("Worker request cannot be null");
+                return _logger.LogErrorAndReturnFail<WorkerResponse>("Worker request cannot be null");
 
             var worker = new Worker
             {
@@ -65,8 +65,8 @@ public class WorkerService : IWorkerService
             if (worker is null)
                 return _logger.LogErrorAndReturnFail<WorkerResponse>($"No worker with id = {id} found in the database, nothing updated");
 
-            worker.Name = workerRequest.Name!;
-            worker.Department = workerRequest.Department!;
+            worker.Name = workerRequest.Name ?? worker.Name;
+            worker.Department = workerRequest.Department ?? worker.Department;
             worker.Email = workerRequest.Email;
             worker.TelephoneNumber = workerRequest.TelephoneNumber;
 

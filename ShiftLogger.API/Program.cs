@@ -5,9 +5,9 @@ using ShiftLogger.API.Services;
 
 var loggingDirectory = Path.Combine(Directory.GetCurrentDirectory(), "Logs");
 Directory.CreateDirectory(loggingDirectory);
-string filePath = Path.Combine(loggingDirectory, "shift-logger-.txt");
+var filePath = Path.Combine(loggingDirectory, "shift-logger-.txt");
 
-string outputTemplate = "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}";
+var outputTemplate = "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}";
 
 
 Log.Logger = new LoggerConfiguration()

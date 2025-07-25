@@ -72,7 +72,9 @@ public class ShiftService : IShiftService
             if (shiftRequest.StartTime >= shiftRequest.EndTime)
                 return _logger.LogErrorAndReturnFail<ShiftResponse>("Start time must come before end time");
 
-            var shift = await _context.Shifts.FindAsync(shiftId, cancellationToken);
+            var shift = await _context.Shifts
+                .Include(shift => shift.Worker)
+                .FirstAsync(shift => shift.Id == shiftId, cancellationToken);
 
             if (shift is null)
                 return _logger.LogErrorAndReturnFail<ShiftResponse>($"There is no shift with id = {shiftId} available in the database, nothing updated");
@@ -191,15 +193,11 @@ public class ShiftService : IShiftService
                 return _logger.LogErrorAndReturnFail<ShiftResponse>($"Shift id = {id} is invalid, shift ids must be greater than 0");
 
             var shift = await _context.Shifts
-                .FirstOrDefaultAsync(shift => shift.Id == id, cancellationToken);
+                .Include(shift => shift.Worker)
+                .FirstAsync(shift => shift.Id == id, cancellationToken);
 
             if (shift is null)
                 return _logger.LogErrorAndReturnFail<ShiftResponse>($"There is no shift available in the database with id = {id}");
-
-            var worker = await _context.Workers.FindAsync(shift.WorkerId, cancellationToken);
-
-            if (worker is null)
-                return _logger.LogErrorAndReturnFail<ShiftResponse>($"There is no worker in the database with id = {shift.WorkerId}");
 
             return Result<ShiftResponse>.Ok(MapToShiftResponse(shift));
 

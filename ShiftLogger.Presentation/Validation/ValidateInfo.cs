@@ -2,7 +2,7 @@
 
 namespace ShiftLogger.Presentation.Validation;
 
-public class ValidateInfo
+public static class ValidateInfo
 {
     public static bool IsValidInputString(string input)
     {
